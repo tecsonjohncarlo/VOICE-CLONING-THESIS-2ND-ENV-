@@ -1,0 +1,5 @@
+embeddings {
+  tensor_name: "speaker_embeddings_epoch_9:00009"
+  metadata_path: "00009/speaker_embeddings_epoch_9\\metadata.tsv"
+  tensor_path: "00009/speaker_embeddings_epoch_9\\tensors.tsv"
+}
