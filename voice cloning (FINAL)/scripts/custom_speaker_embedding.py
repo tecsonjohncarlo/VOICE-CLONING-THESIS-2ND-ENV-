@@ -1,8 +1,3 @@
-"""
-Fine-Tune Existing Speaker Encoder with New Speaker + TensorBoard Integration
-Adds new speaker to your trained VCTK/RAVDESS model without losing existing knowledge
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -590,13 +585,11 @@ def main():
     print("="*70)
     print("SPEAKER ENCODER FINE-TUNING WITH TENSORBOARD")
     print("="*70)
-    print("\nThis script fine-tunes your existing VCTK/RAVDESS model")
-    print("by adding a new speaker without losing existing knowledge.")
     
     while True:
         print("\n" + "="*70)
         print("MENU:")
-        print("1. Fine-tune model with new speaker (4 audio files)")
+        print("1. Fine-tune model with new speaker (10 audio files)")
         print("2. Exit")
         
         choice = input("\nEnter choice (1-2): ").strip()
