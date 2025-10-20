@@ -1,0 +1,43 @@
+# Core Dependencies - Version-locked for compatibility
+# Install in this specific order
+
+# NumPy MUST be installed first and locked to <2.0
+numpy<2.0,>=1.21.0
+
+# PyTorch (install before other packages that depend on it)
+torch==2.1.2
+torchaudio==2.1.2
+
+# Audio processing
+librosa==0.10.1
+soundfile==0.12.1
+scipy==1.11.3
+
+# Coqui TTS (may downgrade some packages - that's expected)
+TTS==0.22.0
+
+# RVC Dependencies (install before rvc-python)
+fairseq==0.12.2
+praat-parselmouth==0.4.3
+pyworld==0.3.4
+faiss-cpu==1.7.3
+
+# Hugging Face (compatible versions)
+huggingface-hub>=0.19.4,<0.21.0
+transformers>=4.35.2,<4.37.0
+
+# RVC (Retrieval-based Voice Conversion)
+# Note: This may have dependency conflicts - install last
+rvc-python==0.1.5
+
+# Audio Utilities
+pydub==0.25.1
+noisereduce==2.0.1
+simpleaudio==1.0.4
+
+# Other utilities
+tqdm
+matplotlib
+unidecode
+numba
+psutil

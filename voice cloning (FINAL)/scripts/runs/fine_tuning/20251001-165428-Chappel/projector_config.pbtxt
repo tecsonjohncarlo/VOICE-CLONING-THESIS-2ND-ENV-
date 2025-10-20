@@ -1,0 +1,25 @@
+embeddings {
+  tensor_name: "speaker_embeddings_epoch_9:00009"
+  metadata_path: "00009/speaker_embeddings_epoch_9\\metadata.tsv"
+  tensor_path: "00009/speaker_embeddings_epoch_9\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "speaker_embeddings_epoch_19:00019"
+  metadata_path: "00019/speaker_embeddings_epoch_19\\metadata.tsv"
+  tensor_path: "00019/speaker_embeddings_epoch_19\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "speaker_embeddings_epoch_29:00029"
+  metadata_path: "00029/speaker_embeddings_epoch_29\\metadata.tsv"
+  tensor_path: "00029/speaker_embeddings_epoch_29\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "speaker_embeddings_epoch_39:00039"
+  metadata_path: "00039/speaker_embeddings_epoch_39\\metadata.tsv"
+  tensor_path: "00039/speaker_embeddings_epoch_39\\tensors.tsv"
+}
+embeddings {
+  tensor_name: "speaker_embeddings_epoch_49:00049"
+  metadata_path: "00049/speaker_embeddings_epoch_49\\metadata.tsv"
+  tensor_path: "00049/speaker_embeddings_epoch_49\\tensors.tsv"
+}
