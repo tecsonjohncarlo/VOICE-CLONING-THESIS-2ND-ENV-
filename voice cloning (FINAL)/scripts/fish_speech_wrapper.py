@@ -10,6 +10,7 @@ from pathlib import Path
 import tempfile
 import shutil
 import json
+import sys
 import time
 from typing import Optional, Union, List
 import warnings
@@ -27,7 +28,7 @@ class FishSpeechTTS:
     3. Synthesize audio from semantic tokens
     """
     
-    def __init__(self, model_path="checkpoints/openaudio-s1-mini", device="cuda"):
+    def __init__(self, model_path="checkpoints/openaudio-s1", device="cuda"):
         """
         Initialize Fish Speech TTS
         
@@ -87,11 +88,8 @@ class FishSpeechTTS:
         
         print(f"  Extracting VQ tokens from {audio_path.name}...")
         
-        cmd = [
-            "python", "fish_speech/models/dac/inference.py",
-            "-i", str(audio_path),
-            "--checkpoint-path", str(self.codec_path)
-        ]
+        cmd = [sys.executable, "fish_speech/models/dac/inference.py", "-i", str(audio_path), 
+       "--checkpoint-path", str(self.codec_path)]
         
         try:
             result = subprocess.run(
@@ -147,10 +145,9 @@ class FishSpeechTTS:
         print(f"  Generating semantic tokens...")
         print(f"    Text: '{text[:50]}{'...' if len(text) > 50 else ''}'")
         
-        cmd = [
-            "python", "fish_speech/models/text2semantic/inference.py",
-            "--text", text
-        ]
+        cmd = [sys.executable,
+         "fish_speech/models/text2semantic/inference.py", "--text",
+          text]
         
         if vq_tokens_path:
             cmd.extend(["--prompt-tokens", str(vq_tokens_path)])
@@ -211,10 +208,9 @@ class FishSpeechTTS:
         
         print(f"  Synthesizing audio...")
         
-        cmd = [
-            "python", "fish_speech/models/dac/inference.py",
-            "-i", str(semantic_tokens_path),
-            "--checkpoint-path", str(self.codec_path)
+        cmd = [sys.executable, 
+        "fish_speech/models/dac/inference.py", "-i", str(audio_path), 
+        "--checkpoint-path", str(self.codec_path)
         ]
         
         try:
