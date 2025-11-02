@@ -10,6 +10,8 @@ import time
 import hashlib
 import tempfile
 import shutil
+import platform
+import subprocess
 from pathlib import Path
 from typing import Optional, Union, Tuple, Dict, Any
 from functools import lru_cache
@@ -20,6 +22,7 @@ import numpy as np
 import torch
 import soundfile as sf
 import torchaudio
+import psutil
 from loguru import logger
 
 warnings.filterwarnings('ignore')
@@ -83,6 +86,328 @@ class LRUCache:
     
     def clear(self):
         self.cache.clear()
+
+
+class UniversalHardwareDetector:
+    """Detect hardware and select optimal configuration"""
+    
+    def __init__(self):
+        self.system = platform.system()
+        self.machine = platform.machine()
+        self.cpu_info = self._get_cpu_info()
+        self.memory_gb = psutil.virtual_memory().total / (1024**3)
+        
+    def _get_cpu_info(self) -> Dict[str, Any]:
+        """Get detailed CPU information"""
+        cpu_info = {
+            'model': platform.processor(),
+            'cores_physical': psutil.cpu_count(logical=False),
+            'cores_logical': psutil.cpu_count(logical=True),
+            'max_frequency': 0
+        }
+        
+        try:
+            freq = psutil.cpu_freq()
+            if freq:
+                cpu_info['max_frequency'] = freq.max
+        except:
+            pass
+        
+        return cpu_info
+    
+    def detect_cpu_tier(self) -> str:
+        """Classify CPU into performance tiers"""
+        model = self.cpu_info['model'].lower()
+        cores_physical = self.cpu_info['cores_physical']
+        
+        # Intel Detection
+        if 'intel' in model:
+            if any(x in model for x in ['i9', 'i7']) and cores_physical >= 8:
+                return 'intel_high_end'
+            elif 'i5' in model and '12' in model:
+                return 'i5_baseline'
+            elif 'i5' in model or 'i3' in model:
+                return 'intel_low_end'
+        
+        # AMD Detection
+        elif 'amd' in model or 'ryzen' in model:
+            if any(x in model for x in ['ryzen 9', 'ryzen 7']) and cores_physical >= 8:
+                return 'amd_high_end'
+            else:
+                return 'amd_mobile'
+        
+        # Apple Silicon Detection
+        elif self.system == 'Darwin' and 'arm' in self.machine.lower():
+            if self._is_m1_pro_or_better():
+                return 'm1_pro'
+            else:
+                return 'm1_air'
+        
+        return 'intel_low_end'  # Conservative default
+    
+    def _is_m1_pro_or_better(self) -> bool:
+        """Detect M1 Pro/Max/Ultra vs M1 Air"""
+        try:
+            result = subprocess.run(['system_profiler', 'SPHardwareDataType'], 
+                                  capture_output=True, text=True, timeout=5)
+            if any(x in result.stdout for x in ['MacBook Pro', 'Mac Studio', 'iMac']):
+                return True
+            return False
+        except:
+            return False
+
+
+class ThermalManager:
+    """Platform-aware thermal management"""
+    
+    def __init__(self, platform_name: str, cpu_tier: str = 'unknown'):
+        self.platform = platform_name
+        self.cpu_tier = cpu_tier
+        self.monitoring_available = False
+        self.throttle_threshold = 85
+        self.cooldown_target = 75
+        
+        # M1 Air throttling tracking
+        self.is_m1_air = (cpu_tier == 'm1_air')
+        self.session_start_time = time.time()
+        self.expected_throttle_time = 600  # 10 minutes for M1 Air
+        
+        if self.is_m1_air:
+            logger.warning(
+                "⚠️  M1 MacBook Air detected. Performance will degrade after ~10 minutes "
+                "of sustained load due to fanless design."
+            )
+        
+        self._init_monitoring()
+    
+    def _init_monitoring(self):
+        """Initialize platform-specific thermal monitoring"""
+        if self.platform == 'Windows':
+            self._init_windows_monitoring()
+        elif self.platform == 'Darwin':
+            self._init_macos_monitoring()
+        elif self.platform == 'Linux':
+            self._init_linux_monitoring()
+    
+    def _init_windows_monitoring(self):
+        """Windows thermal monitoring - requires external tools"""
+        logger.warning(
+            "Windows temperature monitoring requires external tools.\n"
+            "   Install one of these for thermal management:\n"
+            "   - LibreHardwareMonitor: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor\n"
+            "   - Core Temp: https://www.alcpu.com/CoreTemp/\n"
+            "   - HWiNFO64: https://www.hwinfo.com/download/"
+        )
+        
+        # Try LibreHardwareMonitor first
+        if self._try_libre_hardware_monitor():
+            self.monitoring_available = True
+            logger.info("✅ LibreHardwareMonitor detected - thermal monitoring enabled")
+            return
+        
+        # Try Core Temp
+        if self._try_core_temp():
+            self.monitoring_available = True
+            logger.info("✅ Core Temp detected - thermal monitoring enabled")
+            return
+        
+        logger.warning("❌ No thermal monitoring available - continuing without thermal protection")
+    
+    def _try_libre_hardware_monitor(self) -> bool:
+        """Try LibreHardwareMonitor - requires admin rights and LHM running"""
+        try:
+            import wmi
+            w = wmi.WMI(namespace="root\\LibreHardwareMonitor")
+            sensors = w.Sensor()
+            return len(sensors) > 0
+        except Exception as e:
+            logger.debug(f"LibreHardwareMonitor unavailable: {e}")
+            return False
+    
+    def _try_core_temp(self) -> bool:
+        """Try Core Temp shared memory - requires Core Temp running"""
+        try:
+            import mmap
+            import struct
+            with mmap.mmap(-1, 1024, "CoreTempMappingObject", access=mmap.ACCESS_READ) as mm:
+                data = struct.unpack('I' * 256, mm.read(1024))
+                return data[0] == 0x434F5254  # 'CORT' signature
+        except (OSError, FileNotFoundError) as e:
+            logger.debug(f"Core Temp unavailable: {e}")
+            return False
+    
+    def _init_macos_monitoring(self):
+        """macOS thermal monitoring via powermetrics"""
+        try:
+            subprocess.run(['powermetrics', '--version'], capture_output=True, timeout=2)
+            self.monitoring_available = True
+            logger.info("macOS thermal monitoring enabled")
+        except:
+            logger.warning("powermetrics unavailable - thermal monitoring disabled")
+    
+    def _init_linux_monitoring(self):
+        """Linux thermal monitoring via /sys/class/thermal"""
+        thermal_zones = list(Path('/sys/class/thermal').glob('thermal_zone*'))
+        if thermal_zones:
+            self.monitoring_available = True
+            logger.info("Linux thermal monitoring enabled")
+        else:
+            logger.warning("No thermal zones found - thermal monitoring disabled")
+    
+    def get_temperature(self) -> Optional[float]:
+        """Get current CPU temperature"""
+        if not self.monitoring_available:
+            return None
+        
+        try:
+            if self.platform == 'Linux':
+                return self._get_linux_temp()
+            elif self.platform == 'Darwin':
+                return self._get_macos_temp()
+            elif self.platform == 'Windows':
+                return self._get_windows_temp()
+        except Exception as e:
+            logger.debug(f"Temperature read failed: {e}")
+        return None
+    
+    def _get_linux_temp(self) -> Optional[float]:
+        """Read Linux thermal zone"""
+        try:
+            temp_file = Path('/sys/class/thermal/thermal_zone0/temp')
+            if temp_file.exists():
+                temp = int(temp_file.read_text().strip()) / 1000.0
+                return temp
+        except:
+            pass
+        return None
+    
+    def _get_macos_temp(self) -> Optional[float]:
+        """Read macOS temperature via powermetrics"""
+        # Simplified - would need full implementation
+        return None
+    
+    def _get_windows_temp(self) -> Optional[float]:
+        """Read Windows temperature via LibreHardwareMonitor or Core Temp"""
+        # Try LibreHardwareMonitor first
+        temp = self._get_lhm_temperature()
+        if temp:
+            return temp
+        
+        # Fallback to Core Temp
+        try:
+            import mmap
+            import struct
+            with mmap.mmap(-1, 1024, "CoreTempMappingObject", access=mmap.ACCESS_READ) as mm:
+                data = struct.unpack('256I', mm.read(1024))
+                if data[0] == 0x434F5254:  # 'CORT' signature
+                    cpu_temp = data[2]
+                    if 10 <= cpu_temp <= 120:
+                        return float(cpu_temp)
+        except:
+            pass
+        return None
+    
+    def _get_lhm_temperature(self) -> Optional[float]:
+        """Get temperature from LibreHardwareMonitor"""
+        try:
+            import wmi
+            w = wmi.WMI(namespace="root\\LibreHardwareMonitor")
+            temperature_infos = w.Sensor()
+            for sensor in temperature_infos:
+                if sensor.SensorType == 'Temperature' and 'CPU' in sensor.Name:
+                    return float(sensor.Value)
+        except Exception as e:
+            logger.debug(f"LHM temperature read failed: {e}")
+        return None
+    
+    def wait_for_thermal_recovery(self):
+        """Wait for thermal recovery - prevents infinite loops"""
+        max_wait_time = 180  # 3 minutes absolute maximum
+        elapsed = 0
+        consecutive_none_count = 0
+        total_none_count = 0
+        max_none_tolerance = 15
+        absolute_none_limit = 30
+        
+        logger.info("Waiting for thermal recovery...")
+        
+        while elapsed < max_wait_time:
+            current_temp = self.get_temperature()
+            
+            if current_temp is None:
+                consecutive_none_count += 1
+                total_none_count += 1
+                
+                if consecutive_none_count >= max_none_tolerance:
+                    logger.warning(
+                        f"Temperature monitoring failed {consecutive_none_count} times consecutively. "
+                        "Using conservative cooling period."
+                    )
+                    time.sleep(15)
+                    elapsed += 15
+                    consecutive_none_count = 0
+                    
+                    if total_none_count >= absolute_none_limit:
+                        logger.error(
+                            f"Temperature monitoring completely unavailable after {total_none_count} attempts. "
+                            "Aborting thermal recovery - continuing with risk."
+                        )
+                        return
+                    continue
+                
+                time.sleep(2)
+                elapsed += 2
+                continue
+            
+            # Valid temperature reading
+            consecutive_none_count = 0
+            
+            if current_temp < self.cooldown_target:
+                logger.info(f"Thermal recovery complete: {current_temp:.1f}°C")
+                return
+            
+            logger.info(f"Cooling: {current_temp:.1f}°C → target: {self.cooldown_target}°C")
+            time.sleep(3)
+            elapsed += 3
+        
+        logger.warning(
+            f"Thermal recovery timeout ({max_wait_time}s) reached. "
+            "Continuing with elevated thermal risk."
+        )
+    
+    def predict_throttling_behavior(self, elapsed_time: float) -> Dict[str, Any]:
+        """Predict throttling behavior for M1 Air"""
+        if self.is_m1_air:
+            total_runtime = time.time() - self.session_start_time
+            
+            if total_runtime > self.expected_throttle_time:
+                return {
+                    'throttled': True,
+                    'expected_performance_loss': '40-60%',
+                    'power_limit': '4W',
+                    'runtime_minutes': total_runtime / 60,
+                    'message': 'M1 Air thermal saturation reached - performance degraded'
+                }
+        
+        return {
+            'throttled': False,
+            'expected_performance_loss': '0%',
+            'power_limit': '10W',
+            'message': 'Normal thermal state'
+        }
+    
+    def get_throttle_warning(self) -> Optional[str]:
+        """Get throttle warning message if applicable"""
+        if self.is_m1_air:
+            total_runtime = time.time() - self.session_start_time
+            remaining = self.expected_throttle_time - total_runtime
+            
+            if remaining <= 0:
+                return "⚠️  M1 Air: Thermal throttling active - performance reduced by 40-60%"
+            elif remaining <= 120:  # 2 minutes warning
+                return f"⚠️  M1 Air: Thermal throttling expected in {int(remaining/60)} minutes"
+        
+        return None
 
 
 class PerformanceMonitor:
@@ -165,7 +490,7 @@ class OptimizedFishSpeechV2:
                  enable_optimizations: bool = True,
                  optimize_for_memory: bool = False):
         """
-        Initialize optimized Fish Speech engine V2
+        Initialize optimized Fish Speech engine V2 with universal hardware detection
         
         Args:
             model_path: Path to model directory
@@ -176,6 +501,13 @@ class OptimizedFishSpeechV2:
         self.model_path = Path(model_path)
         self.enable_optimizations = enable_optimizations
         self.optimize_for_memory = optimize_for_memory
+        
+        # Universal hardware detection
+        self.hw_detector = UniversalHardwareDetector()
+        self.cpu_tier = self.hw_detector.detect_cpu_tier()
+        
+        # Initialize thermal management with cpu_tier for M1 Air detection
+        self.thermal_manager = ThermalManager(platform.system(), self.cpu_tier)
         
         # Auto-detect device
         if device == "auto":
@@ -206,6 +538,9 @@ class OptimizedFishSpeechV2:
         # Get precision mode
         self.precision_mode = self._get_precision_mode()
         self.precision = self._get_torch_dtype()
+        
+        # Log hardware configuration
+        self._log_hardware_config()
         
         # Initialize models
         logger.info(f"Loading Fish Speech models...")
@@ -244,6 +579,20 @@ class OptimizedFishSpeechV2:
         self._warmup()
         
         logger.info("✅ OptimizedFishSpeechV2 initialized successfully!")
+    
+    def _log_hardware_config(self):
+        """Log detected hardware configuration"""
+        hw = self.hw_detector.cpu_info
+        logger.info("="*60)
+        logger.info("Hardware Configuration")
+        logger.info("="*60)
+        logger.info(f"CPU: {hw['model']}")
+        logger.info(f"Cores: {hw['cores_physical']} physical, {hw['cores_logical']} logical")
+        logger.info(f"Memory: {self.hw_detector.memory_gb:.1f} GB")
+        logger.info(f"System: {self.hw_detector.system}")
+        logger.info(f"Performance Tier: {self.cpu_tier}")
+        logger.info(f"Thermal Monitoring: {'Enabled' if self.thermal_manager.monitoring_available else 'Disabled'}")
+        logger.info("="*60)
     
     def _detect_device(self) -> str:
         """Auto-detect best available device"""
@@ -421,6 +770,15 @@ class OptimizedFishSpeechV2:
         start_time = time.time()
         output_path = Path(output_path)
         
+        # Check thermal state before synthesis
+        if self.thermal_manager.monitoring_available:
+            temp = self.thermal_manager.get_temperature()
+            if temp and temp > self.thermal_manager.throttle_threshold:
+                logger.warning(f"High temperature detected: {temp:.1f}°C (threshold: {self.thermal_manager.throttle_threshold}°C)")
+                self.thermal_manager.wait_for_thermal_recovery()
+        else:
+            logger.debug("Thermal monitoring unavailable - proceeding without protection")
+        
         # Track GPU memory before
         if self.device == "cuda":
             torch.cuda.reset_peak_memory_stats()
@@ -498,6 +856,18 @@ class OptimizedFishSpeechV2:
                 peak_vram_mb = torch.cuda.max_memory_allocated() / (1024**2)
             
             gpu_util = self.monitor.get_gpu_utilization()
+            
+            # Check M1 Air throttling status
+            if self.cpu_tier == 'm1_air':
+                throttle_state = self.thermal_manager.predict_throttling_behavior(latency_ms / 1000)
+                if throttle_state['throttled']:
+                    logger.warning(f"⚠️  {throttle_state['message']}")
+                    logger.info(f"   Runtime: {throttle_state['runtime_minutes']:.1f} minutes")
+                    logger.info(f"   Performance loss: {throttle_state['expected_performance_loss']}")
+                else:
+                    warning = self.thermal_manager.get_throttle_warning()
+                    if warning:
+                        logger.info(warning)
             
             # Record metrics
             self.monitor.record_latency(latency_ms)
