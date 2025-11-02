@@ -1,6 +1,11 @@
 """
 FastAPI Backend for Optimized Fish Speech TTS
-Provides REST API endpoints for TTS synthesis with performance monitoring
+WITH SMART ADAPTIVE BACKEND - Auto-detects hardware and self-optimizes
+
+CHANGES FROM ORIGINAL:
+1. Import SmartAdaptiveBackend instead of OptimizedFishSpeechV2
+2. Remove device parameter (auto-detected)
+3. Engine automatically optimizes based on hardware
 """
 
 import os
@@ -18,19 +23,17 @@ from pydantic import BaseModel, Field
 import soundfile as sf
 import numpy as np
 
-# Try V2 engine first (uses direct imports), fallback to V1 (subprocess)
-try:
-    from opt_engine_v2 import OptimizedFishSpeechV2 as OptimizedFishSpeech
-    print("[INFO] Using OptimizedFishSpeechV2 (direct imports)")
-except ImportError as e:
-    print(f"[WARNING] V2 engine not available ({e}), falling back to V1")
-    from opt_engine import OptimizedFishSpeech
+# ========================================
+# CHANGED: Use Smart Adaptive Backend
+# ========================================
+from smart_backend import SmartAdaptiveBackend as OptimizedFishSpeech
+print("[INFO] Using SmartAdaptiveBackend (auto-optimizing)")
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Optimized Fish Speech TTS API",
-    description="High-performance TTS API with voice cloning using OpenAudio S1-Mini",
-    version="1.0.0"
+    title="Optimized Fish Speech TTS API with Smart Backend",
+    description="Self-optimizing TTS API that auto-detects hardware and adapts configuration",
+    version="2.0.0"
 )
 
 # CORS middleware
@@ -47,7 +50,7 @@ engine: Optional[OptimizedFishSpeech] = None
 executor = ThreadPoolExecutor(max_workers=4)
 
 
-# Pydantic models
+# Pydantic models (unchanged)
 class TTSRequest(BaseModel):
     """TTS request parameters"""
     text: str = Field(..., description="Text to synthesize")
@@ -61,17 +64,21 @@ class TTSRequest(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """Health check response"""
+    """Health check response with smart insights"""
     status: str
     device: str
     system_info: dict
     cache_stats: dict
+    smart_insights: Optional[List[str]] = None
+    current_resources: Optional[dict] = None
+    hardware_profile: Optional[dict] = None
 
 
 class MetricsResponse(BaseModel):
-    """Metrics response"""
+    """Metrics response with resource monitoring"""
     rolling_aggregates: dict
     current_gpu_util: float
+    current_resources: Optional[dict] = None
 
 
 class VoiceInfo(BaseModel):
@@ -83,19 +90,28 @@ class VoiceInfo(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize engine on startup"""
+    """
+    Initialize smart adaptive engine on startup
+    
+    CHANGED: Removed device parameter - auto-detected by smart backend
+    """
     global engine
     
     model_path = os.getenv("MODEL_DIR", "checkpoints/openaudio-s1-mini")
-    device = os.getenv("DEVICE", "auto")
     
     try:
-        engine = OptimizedFishSpeech(
-            model_path=model_path,
-            device=device,
-            enable_optimizations=True
-        )
-        print("[OK] Engine initialized successfully")
+        # ========================================
+        # CHANGED: Just pass model_path
+        # Smart backend auto-detects everything!
+        # ========================================
+        engine = OptimizedFishSpeech(model_path=model_path)
+        
+        print("[OK] Smart Adaptive Engine initialized")
+        print(f"[INFO] Detected device: {engine.profile.device_type}")
+        print(f"[INFO] CPU tier: {engine.profile.cpu_tier}")
+        print(f"[INFO] Optimization strategy: {engine.config.optimization_strategy}")
+        print(f"[INFO] Expected RTF: {engine.config.expected_rtf:.1f}x")
+        
     except Exception as e:
         print(f"[ERROR] Failed to initialize engine: {e}")
         raise
@@ -118,8 +134,11 @@ def run_tts_sync(text: str,
                  speed: float,
                  seed: Optional[int],
                  output_path: Path) -> dict:
-    """Run TTS synchronously in thread pool"""
-    # Note: speed parameter not implemented in Fish Speech, ignored
+    """
+    Run TTS synchronously in thread pool
+    
+    UNCHANGED: Smart backend has same interface as OptimizedFishSpeechV2
+    """
     audio, sr, metrics = engine.tts(
         text=text,
         speaker_wav=speaker_file,
@@ -147,6 +166,8 @@ async def text_to_speech(
     """
     Generate speech from text with optional voice cloning
     
+    NOW WITH: Automatic resource monitoring and adaptive optimization
+    
     Returns audio/wav with metrics in response headers
     """
     if not engine:
@@ -159,7 +180,6 @@ async def text_to_speech(
     speaker_path = None
     if speaker_file:
         try:
-            # Create temp file for speaker audio
             suffix = Path(speaker_file.filename).suffix if speaker_file.filename else ".wav"
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 content = await speaker_file.read()
@@ -173,7 +193,7 @@ async def text_to_speech(
         output_path = Path(tmp.name)
     
     try:
-        # Run TTS in thread pool to avoid blocking
+        # Run TTS in thread pool (smart backend handles resource monitoring)
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             executor,
@@ -193,17 +213,18 @@ async def text_to_speech(
         # Read generated audio
         audio_bytes = output_path.read_bytes()
         
-        # Create streaming response
+        # Create streaming response with enhanced metrics
         response = StreamingResponse(
             io.BytesIO(audio_bytes),
             media_type="audio/wav",
             headers={
                 "Content-Disposition": "attachment; filename=output.wav",
                 "X-Latency-Ms": str(int(metrics['latency_ms'])),
-                "X-Peak-VRAM-Mb": str(int(metrics['peak_vram_mb'])),
-                "X-GPU-Util-Pct": str(int(metrics['gpu_util_pct'])),
+                "X-Peak-VRAM-Mb": str(int(metrics.get('peak_vram_mb', 0))),
+                "X-GPU-Util-Pct": str(int(metrics.get('gpu_util_pct', 0))),
                 "X-Audio-Duration-S": str(round(metrics['audio_duration_s'], 2)),
-                "X-RTF": str(round(metrics['rtf'], 2))
+                "X-RTF": str(round(metrics['rtf'], 2)),
+                "X-Optimization-Strategy": engine.config.optimization_strategy
             }
         )
         
@@ -230,15 +251,17 @@ async def text_to_speech(
 async def list_voices():
     """
     List cached speakers and reference embeddings
+    
+    UNCHANGED
     """
     if not engine:
         raise HTTPException(status_code=503, detail="Engine not initialized")
     
     voices = []
     
-    # Get cached references (V2) or VQ tokens (V1)
-    cache = getattr(engine, 'reference_cache', None) or getattr(engine, 'vq_cache', None)
-    if cache:
+    # Get cached references
+    if hasattr(engine.engine, 'reference_cache'):
+        cache = engine.engine.reference_cache
         for i, (key, value) in enumerate(cache.cache.items()):
             voices.append(VoiceInfo(
                 id=f"voice_{i}",
@@ -252,13 +275,14 @@ async def list_voices():
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """
-    Get system health status
+    Get system health status with smart insights
     
-    Returns device info, compute capability, dtype, and optimization flags
+    ENHANCED: Now includes intelligent insights and resource monitoring
     """
     if not engine:
         raise HTTPException(status_code=503, detail="Engine not initialized")
     
+    # Get enhanced health from smart backend
     health = engine.get_health()
     return HealthResponse(**health)
 
@@ -266,9 +290,9 @@ async def health_check():
 @app.get("/metrics", response_model=MetricsResponse)
 async def get_metrics():
     """
-    Get performance metrics
+    Get performance metrics with resource monitoring
     
-    Returns rolling latency, peak VRAM, and GPU utilization
+    ENHANCED: Now includes real-time resource usage
     """
     if not engine:
         raise HTTPException(status_code=503, detail="Engine not initialized")
@@ -289,7 +313,7 @@ async def clear_cache():
 
 @app.get("/emotions")
 async def list_emotions():
-    """Get available emotion markers"""
+    """Get available emotion markers (unchanged)"""
     emotions = {
         'basic': [
             'angry', 'sad', 'excited', 'surprised', 'satisfied', 'delighted',
@@ -316,18 +340,71 @@ async def list_emotions():
     return emotions
 
 
+# ========================================
+# NEW ENDPOINT: Hardware Profile
+# ========================================
+@app.get("/hardware")
+async def get_hardware_profile():
+    """
+    Get detected hardware profile and selected configuration
+    
+    NEW: Shows what the smart backend detected and why it chose this config
+    """
+    if not engine:
+        raise HTTPException(status_code=503, detail="Engine not initialized")
+    
+    profile = engine.profile
+    config = engine.config
+    
+    return {
+        "hardware_profile": {
+            "system": profile.system,
+            "cpu_model": profile.cpu_model,
+            "cpu_tier": profile.cpu_tier,
+            "cores_physical": profile.cores_physical,
+            "cores_logical": profile.cores_logical,
+            "memory_gb": profile.memory_gb,
+            "device_type": profile.device_type,
+            "gpu_name": profile.gpu_name,
+            "gpu_memory_gb": profile.gpu_memory_gb,
+            "thermal_capable": profile.thermal_capable,
+            "avx512_vnni": profile.avx512_vnni
+        },
+        "selected_configuration": {
+            "device": config.device,
+            "precision": config.precision,
+            "quantization": config.quantization,
+            "use_onnx": config.use_onnx,
+            "use_torch_compile": config.use_torch_compile,
+            "chunk_length": config.chunk_length,
+            "num_threads": config.num_threads,
+            "expected_rtf": config.expected_rtf,
+            "expected_memory_gb": config.expected_memory_gb,
+            "optimization_strategy": config.optimization_strategy,
+            "notes": config.notes
+        }
+    }
+
+
 @app.get("/")
 async def root():
-    """Root endpoint"""
+    """Root endpoint with enhanced information"""
     return {
-        "name": "Optimized Fish Speech TTS API",
-        "version": "1.0.0",
+        "name": "Optimized Fish Speech TTS API with Smart Adaptive Backend",
+        "version": "2.0.0",
         "status": "running",
+        "features": [
+            "Auto hardware detection",
+            "Self-optimizing configuration",
+            "Real-time resource monitoring",
+            "Adaptive performance tuning"
+        ],
         "endpoints": {
             "tts": "/tts (POST)",
             "voices": "/voices (GET)",
-            "health": "/health (GET)",
-            "metrics": "/metrics (GET)",
+            "health": "/health (GET) - with smart insights",
+            "metrics": "/metrics (GET) - with resource monitoring",
+            "hardware": "/hardware (GET) - NEW: hardware profile",
             "emotions": "/emotions (GET)",
             "clear_cache": "/cache/clear (POST)"
         }
@@ -339,6 +416,16 @@ if __name__ == "__main__":
     
     port = int(os.getenv("PORT", "8000"))
     host = os.getenv("HOST", "0.0.0.0")
+    
+    print("="*70)
+    print("Starting Fish Speech TTS API with Smart Adaptive Backend")
+    print("="*70)
+    print("Features:")
+    print("  ✅ Automatic hardware detection")
+    print("  ✅ Self-optimizing configuration")
+    print("  ✅ Real-time resource monitoring")
+    print("  ✅ Adaptive performance tuning")
+    print("="*70)
     
     uvicorn.run(
         "app:app",
