@@ -313,31 +313,47 @@ async def clear_cache():
 
 @app.get("/emotions")
 async def list_emotions():
-    """Get available emotion markers (unchanged)"""
-    emotions = {
-        'basic': [
-            'angry', 'sad', 'excited', 'surprised', 'satisfied', 'delighted',
-            'scared', 'worried', 'upset', 'nervous', 'frustrated', 'depressed',
-            'empathetic', 'embarrassed', 'disgusted', 'moved', 'proud', 'relaxed',
-            'grateful', 'confident', 'interested', 'curious', 'confused', 'joyful'
-        ],
-        'advanced': [
-            'disdainful', 'unhappy', 'anxious', 'hysterical', 'indifferent',
-            'impatient', 'guilty', 'scornful', 'panicked', 'furious', 'reluctant',
-            'keen', 'disapproving', 'negative', 'denying', 'astonished', 'serious',
-            'sarcastic', 'conciliative', 'comforting', 'sincere', 'sneering',
-            'hesitating', 'yielding', 'painful', 'awkward', 'amused'
-        ],
-        'tones': [
-            'in a hurry tone', 'shouting', 'screaming', 'whispering', 'soft tone'
-        ],
-        'effects': [
-            'laughing', 'chuckling', 'sobbing', 'crying loudly', 'sighing',
-            'panting', 'groaning', 'crowd laughing', 'background laughter',
-            'audience laughing'
-        ]
+    """
+    Get emotion and prosody guidance
+    
+    ⚠️ IMPORTANT: Fish Speech is a VOICE CLONING model, not emotion-controlled TTS.
+    Emotions come from your REFERENCE AUDIO, not from text tags.
+    
+    These are suggestions for text formatting and reference audio selection.
+    """
+    return {
+        'note': '⚠️ Emotions come from your REFERENCE AUDIO, not text tags!',
+        'how_to_add_emotion': {
+            'primary': 'Use an emotionally expressive reference audio file',
+            'secondary': 'Use punctuation for prosody (!, ?, ..., —)',
+            'advanced': 'Use multiple reference audios for different emotions'
+        },
+        'prosody_markers': {
+            'description': 'Use punctuation to hint at prosody',
+            'markers': {
+                '...': 'Pause, uncertainty, trailing off',
+                '!': 'Excitement, emphasis, surprise',
+                '?': 'Question, uncertainty',
+                '?!': 'Shocked question',
+                '—': 'Interruption, sudden stop',
+                'CAPS': 'Emphasis (use sparingly)'
+            }
+        },
+        'reference_audio_tips': {
+            'excited': 'Use reference with high energy, varied pitch',
+            'nervous': 'Use reference with hesitation, softer tone',
+            'angry': 'Use reference with strong emphasis, louder volume',
+            'sad': 'Use reference with lower pitch, slower pace',
+            'confident': 'Use reference with steady, clear delivery'
+        },
+        'sound_effects': {
+            'description': 'These MAY work if in reference audio',
+            'effects': [
+                'laughing', 'chuckling', 'sobbing', 'crying', 'sighing',
+                'panting', 'groaning', 'whispering'
+            ]
+        }
     }
-    return emotions
 
 
 # ========================================

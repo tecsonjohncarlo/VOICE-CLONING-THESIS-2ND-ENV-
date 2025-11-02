@@ -177,7 +177,38 @@ def main():
             
             language = st.selectbox(
                 "Language",
-                options=["en", "zh", "ja", "ko", "fr", "de", "es", "ar"],
+                options=[
+                    "en",  # English
+                    "zh",  # Chinese
+                    "ja",  # Japanese
+                    "ko",  # Korean
+                    "fr",  # French
+                    "de",  # German
+                    "es",  # Spanish
+                    "pl",  # Polish
+                    "ru",  # Russian
+                    "it",  # Italian
+                    "pt",  # Portuguese
+                    "ar",  # Arabic
+                    "hi",  # Hindi
+                    "tr"   # Turkish
+                ],
+                format_func=lambda x: {
+                    "en": "English",
+                    "zh": "中文 (Chinese)",
+                    "ja": "日本語 (Japanese)",
+                    "ko": "한국어 (Korean)",
+                    "fr": "Français (French)",
+                    "de": "Deutsch (German)",
+                    "es": "Español (Spanish)",
+                    "pl": "Polski (Polish)",
+                    "ru": "Русский (Russian)",
+                    "it": "Italiano (Italian)",
+                    "pt": "Português (Portuguese)",
+                    "ar": "العربية (Arabic)",
+                    "hi": "हिन्दी (Hindi)",
+                    "tr": "Türkçe (Turkish)"
+                }.get(x, x),
                 index=0,
                 help="Auto-detected, for reference only"
             )

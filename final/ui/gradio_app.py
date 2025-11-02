@@ -274,10 +274,25 @@ def create_ui():
                                 )
                             
                             language = gr.Dropdown(
-                                choices=["en", "zh", "ja", "ko", "fr", "de", "es", "ar"],
+                                choices=[
+                                    ("English", "en"),
+                                    ("中文 (Chinese)", "zh"),
+                                    ("日本語 (Japanese)", "ja"),
+                                    ("한국어 (Korean)", "ko"),
+                                    ("Français (French)", "fr"),
+                                    ("Deutsch (German)", "de"),
+                                    ("Español (Spanish)", "es"),
+                                    ("Polski (Polish)", "pl"),
+                                    ("Русский (Russian)", "ru"),
+                                    ("Italiano (Italian)", "it"),
+                                    ("Português (Portuguese)", "pt"),
+                                    ("العربية (Arabic)", "ar"),
+                                    ("हिन्दी (Hindi)", "hi"),
+                                    ("Türkçe (Turkish)", "tr")
+                                ],
                                 value="en",
                                 label="Language",
-                                info="Auto-detected, for reference only"
+                                info="Select target language (Fish Speech auto-detects from text)"
                             )
                             
                             optimize_for_memory = gr.Checkbox(

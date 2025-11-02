@@ -30,6 +30,7 @@ class HardwareProfile:
     gpu_memory_gb: float
     gpu_name: str
     system: str  # 'Windows', 'Darwin', 'Linux'
+    machine: str  # 'x86_64', 'AMD64', 'arm64', etc.
     thermal_capable: bool
     avx512_vnni: bool  # For INT8 CPU optimization
     compute_capability: Optional[Tuple[int, int]]  # For CUDA GPUs
@@ -59,9 +60,26 @@ class SmartHardwareDetector:
     def __init__(self):
         self.system = platform.system()
         self.machine = platform.machine()
+        self.is_wsl = self._detect_wsl()
         self.profile = self._build_complete_profile()
         logger.info("🔍 Hardware detection complete")
         self._log_detection_results()
+    
+    def _detect_wsl(self) -> bool:
+        """Detect if running in WSL2"""
+        if self.system != 'Linux':
+            return False
+        
+        try:
+            # Check for WSL in kernel version
+            with open('/proc/version', 'r') as f:
+                version = f.read().lower()
+                is_wsl = 'microsoft' in version or 'wsl' in version
+                if is_wsl:
+                    logger.info("✅ Running in WSL2 - Triton support available!")
+                return is_wsl
+        except:
+            return False
     
     def _build_complete_profile(self) -> HardwareProfile:
         """Build complete hardware profile"""
@@ -88,6 +106,7 @@ class SmartHardwareDetector:
             gpu_memory_gb=gpu_info['gpu_memory_gb'],
             gpu_name=gpu_info['gpu_name'],
             system=self.system,
+            machine=self.machine,
             thermal_capable=thermal_capable,
             avx512_vnni=avx512_vnni,
             compute_capability=gpu_info['compute_capability']
@@ -243,8 +262,9 @@ class SmartHardwareDetector:
 class ConfigurationSelector:
     """Select optimal configuration based on hardware profile"""
     
-    def __init__(self, profile: HardwareProfile):
+    def __init__(self, profile: HardwareProfile, is_wsl: bool = False):
         self.profile = profile
+        self.is_wsl = is_wsl
     
     def select_optimal_config(self) -> OptimalConfig:
         """Select best configuration for detected hardware"""
@@ -276,12 +296,23 @@ class ConfigurationSelector:
             if self.profile.compute_capability[0] >= 8:  # Ampere+
                 precision = 'bf16'
         
+        # torch.compile requires Triton, which is not available on Windows natively
+        # Auto-enable for:
+        # 1. WSL2 (Linux with Microsoft kernel) - ✅ Has Triton
+        # 2. Native Linux/macOS - ✅ Has Triton
+        # 3. Windows with FORCE_TORCH_COMPILE=1 - User override
+        force_compile = os.getenv('FORCE_TORCH_COMPILE', '0') == '1'
+        use_compile = force_compile or self.is_wsl or (self.profile.system != 'Windows')
+        
+        if self.is_wsl and self.profile.has_gpu:
+            logger.info("🚀 WSL2 + NVIDIA GPU detected - enabling torch.compile for 20-30% speedup!")
+        
         return OptimalConfig(
             device='cuda' if self.profile.device_type == 'cuda' else 'mps',
             precision=precision,
             quantization='int8',  # Selective quantization
-            use_onnx=False,  # torch.compile better for GPU
-            use_torch_compile=True,  # ✅ Critical for GPU
+            use_onnx=False,  # Not needed for GPU
+            use_torch_compile=use_compile,  # Disabled on Windows (no Triton)
             chunk_length=1024,  # Large chunks for GPU
             max_batch_size=4,
             num_threads=self.profile.cores_physical // 2,
@@ -290,7 +321,7 @@ class ConfigurationSelector:
             expected_rtf=2.0 if self.profile.gpu_memory_gb >= 8 else 3.5,
             expected_memory_gb=4.0,
             optimization_strategy='gpu_optimized',
-            notes=f'GPU-accelerated with {precision.upper()} precision + torch.compile'
+            notes=f'GPU-accelerated with {precision.upper()} precision' + (' + torch.compile' if use_compile else ' (torch.compile disabled on Windows)')
         )
     
     def _m1_pro_config(self) -> OptimalConfig:
@@ -514,7 +545,7 @@ class SmartAdaptiveBackend:
         self.profile = self.detector.profile
         
         # Step 2: Select optimal configuration
-        self.selector = ConfigurationSelector(self.profile)
+        self.selector = ConfigurationSelector(self.profile, self.detector.is_wsl)
         self.config = self.selector.select_optimal_config()
         self._log_selected_config()
         
@@ -710,5 +741,5 @@ def create_smart_backend(model_path: str = None) -> SmartAdaptiveBackend:
     """
     if model_path is None:
         model_path = os.getenv("MODEL_DIR", "checkpoints/openaudio-s1-mini")
-    
-    return SmartAdaptiveBackend(
+
+    return SmartAdaptiveBackend(model_path=model_path)
