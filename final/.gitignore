@@ -38,11 +38,9 @@ checkpoints/
 
 # Temporary files
 *.npy
-*.wav
 *.mp3
 codes_*.npy
 fake.npy
-fake.wav
 temp_*/
 tmp_*/
 
