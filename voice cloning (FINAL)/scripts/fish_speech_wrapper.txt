@@ -88,8 +88,11 @@ class FishSpeechTTS:
         
         print(f"  Extracting VQ tokens from {audio_path.name}...")
         
-        cmd = [sys.executable, "fish_speech/models/dac/inference.py", "-i", str(audio_path), 
-       "--checkpoint-path", str(self.codec_path)]
+        cmd = [sys.executable,
+        "fish_speech/models/dac/inference.py", "-i", str(audio_path),  # ← CORRECT!
+        "--checkpoint-path", str(self.codec_path)
+        ]
+
         
         try:
             result = subprocess.run(

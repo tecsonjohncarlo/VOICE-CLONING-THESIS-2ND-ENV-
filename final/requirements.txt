@@ -1,0 +1,31 @@
+# Core dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# UI frameworks
+gradio>=4.0.0
+streamlit>=1.28.0
+
+# PyTorch and audio
+torch>=2.1.0
+torchaudio>=2.1.0
+soundfile>=0.12.0
+librosa>=0.10.0
+numpy>=1.24.0
+pydub>=0.25.0
+
+# Quantization (optional)
+bitsandbytes>=0.41.0
+
+# GPU monitoring
+pynvml>=11.5.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+psutil>=5.9.0
+requests>=2.31.0
+
+# Fish Speech dependencies (if installing from source)
+# Add any additional dependencies from fish-speech/requirements.txt
