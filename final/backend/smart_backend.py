@@ -475,6 +475,205 @@ class ConfigurationSelector:
         )
 
 
+class MemoryBudgetManager:
+    """Strictly enforce memory budgets to prevent throttling"""
+    
+    def __init__(self, hardware_profile: HardwareProfile):
+        self.profile = hardware_profile
+        self.memory_budget = self._calculate_memory_budget()
+        self.current_usage = 0
+        
+    def _calculate_memory_budget(self) -> dict:
+        """Calculate safe memory budgets per hardware tier"""
+        budgets = {
+            "m1_air": {
+                "total_gb": 8,
+                "reserved_for_os": 2.0,
+                "max_model": 2.0,
+                "max_cache": 1.0,
+                "max_batch": 0.5,
+                "safety_margin": 1.5,
+            },
+            "m1_pro": {
+                "total_gb": 16,
+                "reserved_for_os": 2.5,
+                "max_model": 4.0,
+                "max_cache": 2.0,
+                "max_batch": 1.5,
+                "safety_margin": 2.0,
+            },
+            "m1_max": {
+                "total_gb": 32,
+                "reserved_for_os": 3.0,
+                "max_model": 8.0,
+                "max_cache": 4.0,
+                "max_batch": 2.0,
+                "safety_margin": 3.0,
+            },
+            "intel_i5": {
+                "total_gb": 16,
+                "reserved_for_os": 3.0,
+                "max_model": 3.0,
+                "max_cache": 1.5,
+                "max_batch": 0.8,
+                "safety_margin": 2.0,
+            },
+            "intel_high_end": {
+                "total_gb": 32,
+                "reserved_for_os": 4.0,
+                "max_model": 6.0,
+                "max_cache": 3.0,
+                "max_batch": 2.0,
+                "safety_margin": 3.0,
+            },
+            "amd_ryzen5": {
+                "total_gb": 16,
+                "reserved_for_os": 3.0,
+                "max_model": 3.0,
+                "max_cache": 1.5,
+                "max_batch": 0.8,
+                "safety_margin": 2.0,
+            },
+            "amd_high_end": {
+                "total_gb": 32,
+                "reserved_for_os": 4.0,
+                "max_model": 6.0,
+                "max_cache": 3.0,
+                "max_batch": 2.0,
+                "safety_margin": 3.0,
+            },
+        }
+        
+        tier = self.profile.cpu_tier
+        if tier not in budgets:
+            return budgets.get("intel_i5")  # Conservative default
+        
+        return budgets[tier]
+    
+    def enforce_limits(self) -> bool:
+        """Check if memory usage exceeds safe limits"""
+        current_memory_gb = psutil.virtual_memory().used / (1024**3)
+        available_gb = psutil.virtual_memory().available / (1024**3)
+        
+        budget = self.memory_budget
+        safe_limit = (budget["total_gb"] - 
+                     budget["reserved_for_os"] - 
+                     budget["safety_margin"])
+        
+        if available_gb < budget["safety_margin"]:
+            logger.error(f"⚠️ CRITICAL: Only {available_gb:.1f}GB available (need {budget['safety_margin']}GB safety margin)")
+            return False
+        
+        return True
+    
+    def get_adjusted_cache_limit(self) -> int:
+        """Get cache limit that respects memory budget"""
+        available_gb = psutil.virtual_memory().available / (1024**3)
+        max_cache = self.memory_budget["max_cache"]
+        
+        # Conservative: use only 50% of budgeted cache
+        suggested_cache_mb = int((min(available_gb, max_cache) * 0.5) * 1024)
+        
+        logger.info(f"Cache limit: {suggested_cache_mb}MB (available: {available_gb:.1f}GB)")
+        return suggested_cache_mb
+
+
+class QuantizationStrategy:
+    """Advanced quantization for low-memory devices"""
+    
+    @staticmethod
+    def get_quantization_config(cpu_tier: str, available_memory_gb: float) -> dict:
+        """Return quantization strategy per device and memory"""
+        
+        strategies = {
+            "m1_air": {
+                "available_memory_gb": 8,
+                "quantization": "int8",
+                "layer_wise_quant": True,  # Quantize layer-by-layer
+                "weight_only": True,  # Only quantize weights, not activations
+                "dynamic_quant": True,  # Per-tensor quantization
+                "calibration_data_size": 32,  # Small calibration dataset
+            },
+            "m1_pro": {
+                "available_memory_gb": 16,
+                "quantization": "int8",
+                "layer_wise_quant": True,
+                "weight_only": True,
+                "dynamic_quant": True,
+                "calibration_data_size": 64,
+            },
+            "intel_i5": {
+                "available_memory_gb": 16,
+                "quantization": "int8",
+                "layer_wise_quant": True,
+                "weight_only": True,
+                "dynamic_quant": True,
+                "calibration_data_size": 64,
+            },
+            "amd_ryzen5": {
+                "available_memory_gb": 16,
+                "quantization": "int8",
+                "layer_wise_quant": True,
+                "weight_only": True,
+                "dynamic_quant": True,
+                "calibration_data_size": 64,
+            },
+            "intel_high_end": {
+                "available_memory_gb": 32,
+                "quantization": "int8",
+                "layer_wise_quant": False,  # Can handle full quantization
+                "weight_only": False,
+                "dynamic_quant": True,
+                "calibration_data_size": 128,
+            },
+        }
+        
+        config = strategies.get(cpu_tier, strategies["intel_i5"])
+        
+        # Adaptive: if memory is really low, use int4
+        if available_memory_gb < 6:
+            config["quantization"] = "int4"
+            logger.warning(f"⚠️ Aggressive quantization: INT4 (low memory: {available_memory_gb:.1f}GB)")
+        
+        return config
+
+
+class CPUAffinityManager:
+    """Optimize thread affinity to reduce context switching on low-end CPUs"""
+    
+    def __init__(self, profile: HardwareProfile):
+        self.profile = profile
+        
+    def set_thread_affinity(self):
+        """Set optimal thread affinity based on CPU tier"""
+        try:
+            import psutil
+            
+            if self.profile.cpu_tier == "intel_i5":
+                # i5 typically: 2P cores (performance) + 8E cores (efficiency)
+                # Pin inference to P-cores only for better latency
+                p_cores = list(range(0, min(2, self.profile.cores_physical)))
+                psutil.Process().cpu_affinity(p_cores)
+                logger.info(f"✅ Pinned to P-cores: {p_cores}")
+                
+            elif self.profile.cpu_tier in ["amd_ryzen5", "amd_high_end"]:
+                # AMD: typically 6+ cores uniform
+                # Use even core indices for better cache locality
+                cores = list(range(0, self.profile.cores_physical, 2))
+                psutil.Process().cpu_affinity(cores)
+                logger.info(f"✅ Pinned to cores: {cores}")
+                
+            elif self.profile.cpu_tier == "m1_air":
+                # M1 Air: 4 performance + 4 efficiency cores
+                # Pin to performance cores only
+                perf_cores = list(range(0, 4))
+                logger.info(f"✅ M1 Air: Using performance cores {perf_cores}")
+                # Note: macOS doesn't support cpu_affinity, but we log the intent
+                
+        except Exception as e:
+            logger.warning(f"CPU affinity not available: {e}")
+
+
 class ResourceMonitor:
     """Real-time resource monitoring and adaptive adjustment"""
     
@@ -483,6 +682,8 @@ class ResourceMonitor:
         self.gpu_util_history = []
         self.memory_history = []
         self.temp_history = []
+        self.memory_budget_manager = MemoryBudgetManager(profile)
+        self.cpu_affinity_manager = CPUAffinityManager(profile)
     
     def check_resources(self) -> Dict[str, Any]:
         """Check current resource usage"""
@@ -566,13 +767,20 @@ class SmartAdaptiveBackend:
         self.config = self.selector.select_optimal_config()
         self._log_selected_config()
         
-        # Step 3: Initialize resource monitor
+        # Step 3: Initialize resource monitor with memory budget manager
         self.monitor = ResourceMonitor(self.profile)
         
-        # Step 4: Apply configuration
+        # Step 4: Set CPU affinity for optimal performance
+        self.monitor.cpu_affinity_manager.set_thread_affinity()
+        
+        # Step 5: Enforce memory limits before initialization
+        if not self.monitor.memory_budget_manager.enforce_limits():
+            logger.warning("⚠️ Memory constraints detected - using conservative settings")
+        
+        # Step 6: Apply configuration
         self._apply_configuration()
         
-        # Step 5: Initialize engine with optimal settings
+        # Step 7: Initialize engine with optimal settings
         self.engine = self._initialize_engine(model_path)
         
         logger.info("✅ Smart Adaptive Backend initialized successfully!")

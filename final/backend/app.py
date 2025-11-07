@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import soundfile as sf
 import numpy as np
+import psutil  # For memory estimation
 
 # ========================================
 # CHANGED: Use Smart Adaptive Backend
@@ -48,6 +49,9 @@ app.add_middleware(
 # Global engine instance
 engine: Optional[OptimizedFishSpeech] = None
 executor = ThreadPoolExecutor(max_workers=4)
+
+# Global performance monitor
+monitor: Optional[Any] = None
 
 
 # Pydantic models (unchanged)
@@ -95,7 +99,7 @@ async def startup_event():
     
     CHANGED: Removed device parameter - auto-detected by smart backend
     """
-    global engine
+    global engine, monitor
     
     model_path = os.getenv("MODEL_DIR", "checkpoints/openaudio-s1-mini")
     
@@ -111,6 +115,11 @@ async def startup_event():
         print(f"[INFO] CPU tier: {engine.profile.cpu_tier}")
         print(f"[INFO] Optimization strategy: {engine.config.optimization_strategy}")
         print(f"[INFO] Expected RTF: {engine.config.expected_rtf:.1f}x")
+        
+        # Initialize performance monitor
+        from monitoring import PerformanceMonitor
+        monitor = PerformanceMonitor(engine.profile)
+        print(f"[OK] Performance monitoring initialized")
         
     except Exception as e:
         print(f"[ERROR] Failed to initialize engine: {e}")
@@ -413,27 +422,167 @@ async def get_hardware_profile():
     }
 
 
+async def estimate_memory_for_synthesis(text: str, hardware_tier: str) -> dict:
+    """Estimate memory usage before synthesis starts"""
+    
+    # Rough estimates based on text length
+    text_tokens = len(text.split()) * 1.5  # Word → token conversion
+    
+    estimates = {
+        "m1_air": {
+            "base_model_mb": 2000,
+            "per_100_tokens_mb": 50,
+            "cache_overhead_mb": 200,
+        },
+        "m1_pro": {
+            "base_model_mb": 3000,
+            "per_100_tokens_mb": 40,
+            "cache_overhead_mb": 300,
+        },
+        "intel_i5": {
+            "base_model_mb": 2500,
+            "per_100_tokens_mb": 60,
+            "cache_overhead_mb": 250,
+        },
+        "amd_ryzen5": {
+            "base_model_mb": 2500,
+            "per_100_tokens_mb": 60,
+            "cache_overhead_mb": 250,
+        },
+        "intel_high_end": {
+            "base_model_mb": 3000,
+            "per_100_tokens_mb": 50,
+            "cache_overhead_mb": 300,
+        },
+    }
+    
+    est = estimates.get(hardware_tier, estimates["intel_i5"])
+    total_mb = (est["base_model_mb"] + 
+               (text_tokens / 100) * est["per_100_tokens_mb"] +
+               est["cache_overhead_mb"])
+    
+    available_mb = psutil.virtual_memory().available / (1024**2)
+    
+    return {
+        "estimated_mb": total_mb,
+        "available_mb": available_mb,
+        "safe": total_mb < (available_mb * 0.8),  # Leave 20% buffer
+        "text_tokens": text_tokens,
+        "text_length": len(text)
+    }
+
+
+@app.post("/estimate-memory")
+async def estimate_memory(text: str = Form(...)):
+    """Estimate memory before synthesis"""
+    if not engine:
+        raise HTTPException(status_code=503, detail="Engine not initialized")
+    
+    estimate = await estimate_memory_for_synthesis(text, engine.profile.cpu_tier)
+    
+    if not estimate["safe"]:
+        max_words = int(estimate['available_mb'] * 0.6 / 50)
+        return {
+            "status": "warning",
+            "estimate": estimate,
+            "recommendation": f"Text may be too long. Recommended max: {max_words} words ({engine.config.max_text_length} characters)"
+        }
+    
+    return {"status": "ok", "estimate": estimate}
+
+
+@app.get("/system-status")
+async def system_status():
+    """Real-time system status with throttling detection"""
+    if not engine:
+        raise HTTPException(status_code=503, detail="Engine not initialized")
+    
+    resources = engine.monitor.check_resources()
+    
+    throttling_risk = {
+        "memory_critical": resources['memory_percent'] > 85,
+        "cpu_maxed": resources['cpu_percent'] > 90,
+        "thermal_likely": engine.profile.cpu_tier == "m1_air" and resources['cpu_percent'] > 70,
+    }
+    
+    # Check memory budget
+    memory_safe = engine.monitor.memory_budget_manager.enforce_limits()
+    
+    return {
+        "resources": resources,
+        "throttling_risk": throttling_risk,
+        "memory_budget_safe": memory_safe,
+        "recommended_action": (
+            "Reduce text length or clear cache" if throttling_risk['memory_critical'] 
+            else "Wait for system to cool" if throttling_risk['thermal_likely']
+            else "Reduce CPU load" if throttling_risk['cpu_maxed']
+            else "OK"
+        )
+    }
+
+
+@app.post("/optimize-for-hardware")
+async def optimize_for_hardware():
+    """Force re-optimization of current hardware settings"""
+    if not engine:
+        raise HTTPException(status_code=503, detail="Engine not initialized")
+    
+    # Clear caches
+    engine.clear_cache()
+    
+    # Re-check resources
+    resources = engine.monitor.check_resources()
+    
+    # Suggest adjusted config if needed
+    adjusted = engine.monitor.suggest_adjustment(resources, engine.config)
+    
+    if adjusted:
+        return {
+            "status": "adjusted",
+            "previous_config": {
+                "chunk_length": engine.config.chunk_length,
+                "num_threads": engine.config.num_threads,
+                "cache_limit": engine.config.cache_limit,
+                "max_text_length": engine.config.max_text_length,
+            },
+            "new_config": {
+                "chunk_length": adjusted.chunk_length,
+                "num_threads": adjusted.num_threads,
+                "cache_limit": adjusted.cache_limit,
+                "max_text_length": adjusted.max_text_length,
+            }
+        }
+    
+    return {"status": "optimal", "message": "No adjustments needed"}
+
+
 @app.get("/")
 async def root():
     """Root endpoint with enhanced information"""
     return {
         "name": "Optimized Fish Speech TTS API with Smart Adaptive Backend",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "status": "running",
         "features": [
             "Auto hardware detection",
             "Self-optimizing configuration",
             "Real-time resource monitoring",
-            "Adaptive performance tuning"
+            "Adaptive performance tuning",
+            "Memory budget management",
+            "CPU affinity optimization",
+            "Pre-synthesis memory estimation"
         ],
         "endpoints": {
             "tts": "/tts (POST)",
             "voices": "/voices (GET)",
             "health": "/health (GET) - with smart insights",
             "metrics": "/metrics (GET) - with resource monitoring",
-            "hardware": "/hardware (GET) - NEW: hardware profile",
+            "hardware": "/hardware (GET) - hardware profile",
             "emotions": "/emotions (GET)",
-            "clear_cache": "/cache/clear (POST)"
+            "clear_cache": "/cache/clear (POST)",
+            "estimate_memory": "/estimate-memory (POST) - NEW: pre-synthesis check",
+            "system_status": "/system-status (GET) - NEW: real-time status",
+            "optimize": "/optimize-for-hardware (POST) - NEW: force re-optimization"
         }
     }
 
