@@ -52,6 +52,7 @@ class OptimalConfig:
     expected_memory_gb: float
     optimization_strategy: str
     notes: str
+    max_text_length: int = 500  # Maximum text length for this hardware
 
 
 class SmartHardwareDetector:
@@ -307,6 +308,14 @@ class ConfigurationSelector:
         if self.is_wsl and self.profile.has_gpu:
             logger.info("🚀 WSL2 + NVIDIA GPU detected - enabling torch.compile for 20-30% speedup!")
         
+        # Determine max text length based on GPU tier
+        if self.profile.gpu_memory_gb >= 16:
+            max_text = 2000  # High-end GPU (RTX 3090, 4090, A100)
+        elif self.profile.gpu_memory_gb >= 8:
+            max_text = 1000  # Mid-range GPU (RTX 3060, 4060)
+        else:
+            max_text = 600   # Entry-level GPU
+        
         return OptimalConfig(
             device='cuda' if self.profile.device_type == 'cuda' else 'mps',
             precision=precision,
@@ -321,7 +330,8 @@ class ConfigurationSelector:
             expected_rtf=2.0 if self.profile.gpu_memory_gb >= 8 else 3.5,
             expected_memory_gb=4.0,
             optimization_strategy='gpu_optimized',
-            notes=f'GPU-accelerated with {precision.upper()} precision' + (' + torch.compile' if use_compile else ' (torch.compile disabled on Windows)')
+            notes=f'GPU-accelerated with {precision.upper()} precision' + (' + torch.compile' if use_compile else ' (torch.compile disabled on Windows)'),
+            max_text_length=max_text
         )
     
     def _m1_pro_config(self) -> OptimalConfig:
@@ -340,7 +350,8 @@ class ConfigurationSelector:
             expected_rtf=12.0,
             expected_memory_gb=3.0,
             optimization_strategy='m1_pro_sustained',
-            notes='Active cooling maintains sustained performance'
+            notes='Active cooling maintains sustained performance',
+            max_text_length=400  # M1 Pro/Max with active cooling
         )
     
     def _m1_air_config(self) -> OptimalConfig:
@@ -359,7 +370,8 @@ class ConfigurationSelector:
             expected_rtf=15.0,
             expected_memory_gb=2.5,
             optimization_strategy='m1_air_thermal_aware',
-            notes='⚠️ Performance degrades after 10-15min (fanless design)'
+            notes='⚠️ Performance degrades after 10-15min (fanless design)',
+            max_text_length=150  # M1 Air - conservative due to thermal throttling
         )
     
     def _high_end_cpu_config(self) -> OptimalConfig:
@@ -378,7 +390,8 @@ class ConfigurationSelector:
             expected_rtf=3.0,
             expected_memory_gb=4.0,
             optimization_strategy='cpu_onnx_optimized',
-            notes='High-end CPU with ONNX Runtime (4-5x faster)'
+            notes='High-end CPU with ONNX Runtime (4-5x faster)',
+            max_text_length=500  # Intel i7/i9, AMD Ryzen 7/9
         )
     
     def _i5_baseline_config(self) -> OptimalConfig:
@@ -397,7 +410,8 @@ class ConfigurationSelector:
             expected_rtf=8.0,  # With ONNX optimization
             expected_memory_gb=3.5,
             optimization_strategy='i5_onnx_thermal',
-            notes='ONNX Runtime + INT8 quantization (6x faster than baseline)'
+            notes='ONNX Runtime + INT8 quantization (6x faster than baseline)',
+            max_text_length=300  # Intel i5 baseline
         )
     
     def _low_end_cpu_config(self) -> OptimalConfig:
@@ -416,7 +430,8 @@ class ConfigurationSelector:
             expected_rtf=12.0,
             expected_memory_gb=3.0,
             optimization_strategy='conservative_cpu',
-            notes='Conservative settings for stability'
+            notes='Conservative settings for stability',
+            max_text_length=200  # Low-end Intel/AMD
         )
     
     def _mobile_cpu_config(self) -> OptimalConfig:
@@ -435,7 +450,8 @@ class ConfigurationSelector:
             expected_rtf=10.0,
             expected_memory_gb=3.0,
             optimization_strategy='mobile_efficient',
-            notes='Mobile-optimized with aggressive thermal management'
+            notes='Mobile-optimized with aggressive thermal management',
+            max_text_length=250  # Mobile AMD/Intel
         )
     
     def _arm_sbc_config(self) -> OptimalConfig:
@@ -454,7 +470,8 @@ class ConfigurationSelector:
             expected_rtf=25.0,
             expected_memory_gb=1.5,
             optimization_strategy='extreme_memory_saver',
-            notes='⚠️ Proof of concept only - very slow'
+            notes='⚠️ Proof of concept only - very slow',
+            max_text_length=100  # Raspberry Pi - very conservative
         )
 
 
@@ -574,6 +591,7 @@ class SmartAdaptiveBackend:
         logger.info(f"torch.compile: {'✅ Enabled' if c.use_torch_compile else '❌ Disabled'}")
         logger.info(f"Chunk Length: {c.chunk_length}")
         logger.info(f"Threads: {c.num_threads}")
+        logger.info(f"Max Text Length: {c.max_text_length} characters")
         logger.info(f"")
         logger.info(f"Expected Performance:")
         logger.info(f"  RTF: {c.expected_rtf:.1f}x (slower than real-time)")
@@ -623,12 +641,49 @@ class SmartAdaptiveBackend:
             optimize_for_memory=(self.profile.memory_gb < 8)
         )
     
+    def _truncate_text_smart(self, text: str) -> tuple[str, bool, int]:
+        """
+        Intelligently truncate text based on hardware constraints
+        
+        Returns: (truncated_text, was_truncated, original_length)
+        """
+        original_length = len(text)
+        max_length = self.config.max_text_length
+        
+        if original_length <= max_length:
+            return text, False, original_length
+        
+        # Truncate at word boundary to avoid cutting mid-word
+        truncated = text[:max_length]
+        last_space = truncated.rfind(' ')
+        
+        # If space is reasonably close (within 20% of max), cut there
+        if last_space > max_length * 0.8:
+            truncated = truncated[:last_space]
+        
+        logger.warning(
+            f"[{self.profile.cpu_tier}] Text truncated: "
+            f"{original_length} chars → {len(truncated)} chars (max: {max_length})"
+        )
+        
+        return truncated, True, original_length
+    
     def tts(self, text: str, speaker_wav: Optional[str] = None, **kwargs):
         """
-        Smart TTS synthesis with automatic resource monitoring
+        Smart TTS synthesis with automatic resource monitoring and text limiting
         
         Automatically adapts if system is under pressure
         """
+        # Smart text truncation based on hardware
+        text, was_truncated, original_length = self._truncate_text_smart(text)
+        
+        if was_truncated:
+            logger.info(
+                f"Hardware: {self.profile.cpu_tier} | "
+                f"Device: {self.profile.device_type} | "
+                f"Text: {original_length} → {len(text)} chars"
+            )
+        
         # Pre-check resources
         resources = self.monitor.check_resources()
         

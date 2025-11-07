@@ -213,19 +213,29 @@ async def text_to_speech(
         # Read generated audio
         audio_bytes = output_path.read_bytes()
         
-        # Create streaming response with enhanced metrics
+        # Create streaming response with enhanced metrics including text truncation info
+        headers = {
+            "Content-Disposition": "attachment; filename=output.wav",
+            "X-Latency-Ms": str(int(metrics['latency_ms'])),
+            "X-Peak-VRAM-Mb": str(int(metrics.get('peak_vram_mb', 0))),
+            "X-GPU-Util-Pct": str(int(metrics.get('gpu_util_pct', 0))),
+            "X-Audio-Duration-S": str(round(metrics['audio_duration_s'], 2)),
+            "X-RTF": str(round(metrics['rtf'], 2)),
+            "X-Optimization-Strategy": engine.config.optimization_strategy,
+            "X-Hardware-Tier": engine.profile.cpu_tier,
+            "X-Max-Text-Length": str(engine.config.max_text_length)
+        }
+        
+        # Add truncation info if text was truncated
+        if hasattr(metrics, 'get') and metrics.get('text_truncated'):
+            headers["X-Text-Truncated"] = "true"
+            headers["X-Original-Text-Length"] = str(metrics.get('original_text_length', 0))
+            headers["X-Truncated-Text-Length"] = str(metrics.get('truncated_text_length', 0))
+        
         response = StreamingResponse(
             io.BytesIO(audio_bytes),
             media_type="audio/wav",
-            headers={
-                "Content-Disposition": "attachment; filename=output.wav",
-                "X-Latency-Ms": str(int(metrics['latency_ms'])),
-                "X-Peak-VRAM-Mb": str(int(metrics.get('peak_vram_mb', 0))),
-                "X-GPU-Util-Pct": str(int(metrics.get('gpu_util_pct', 0))),
-                "X-Audio-Duration-S": str(round(metrics['audio_duration_s'], 2)),
-                "X-RTF": str(round(metrics['rtf'], 2)),
-                "X-Optimization-Strategy": engine.config.optimization_strategy
-            }
+            headers=headers
         )
         
         return response
@@ -394,6 +404,7 @@ async def get_hardware_profile():
             "use_torch_compile": config.use_torch_compile,
             "chunk_length": config.chunk_length,
             "num_threads": config.num_threads,
+            "max_text_length": config.max_text_length,
             "expected_rtf": config.expected_rtf,
             "expected_memory_gb": config.expected_memory_gb,
             "optimization_strategy": config.optimization_strategy,
