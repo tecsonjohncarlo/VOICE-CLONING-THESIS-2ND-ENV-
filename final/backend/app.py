@@ -12,7 +12,7 @@ import os
 import io
 import tempfile
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Any
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
@@ -201,7 +201,32 @@ async def text_to_speech(
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         output_path = Path(tmp.name)
     
+    # Generate request ID for tracking
+    import uuid
+    request_id = str(uuid.uuid4())[:8]
+    
     try:
+        # Start monitoring (logs to CSV)
+        if monitor:
+            ref_audio_duration = 0.0
+            if speaker_path and speaker_path.exists():
+                try:
+                    import soundfile as sf
+                    audio_data, sr = sf.read(speaker_path)
+                    ref_audio_duration = len(audio_data) / sr
+                except:
+                    pass
+            
+            monitor.start_synthesis(
+                text=text,
+                text_tokens=len(text.split()),  # Rough estimate
+                ref_audio_s=ref_audio_duration,
+                request_id=request_id,
+                config=engine.config
+            )
+            # Start background monitoring loop
+            monitor_task = asyncio.create_task(monitor.monitor_loop())
+        
         # Run TTS in thread pool (smart backend handles resource monitoring)
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
@@ -218,6 +243,31 @@ async def text_to_speech(
         )
         
         metrics = result['metrics']
+        
+        # End monitoring and save to CSV
+        if monitor:
+            # Update synthesis metrics with actual values from TTS engine
+            if monitor.current_synthesis:
+                monitor.current_synthesis.audio_duration_s = metrics.get('audio_duration_s', 0.0)
+                monitor.current_synthesis.peak_gpu_util_pct = metrics.get('gpu_util_pct', 0.0)
+                
+                # Fish Speech specific metrics
+                monitor.current_synthesis.generated_tokens = metrics.get('fish_tokens_generated', 0)
+                monitor.current_synthesis.fish_tokens_per_sec = metrics.get('fish_tokens_per_sec', 0.0)
+                monitor.current_synthesis.fish_bandwidth_gb_s = metrics.get('fish_bandwidth_gb_s', 0.0)
+                monitor.current_synthesis.fish_gpu_memory_gb = metrics.get('fish_gpu_memory_gb', 0.0)
+                monitor.current_synthesis.fish_generation_time_s = metrics.get('fish_generation_time_s', 0.0)
+                monitor.current_synthesis.vq_features_shape = metrics.get('vq_features_shape', '')
+            
+            # Stop monitoring loop
+            monitor.monitoring_active = False
+            # Wait for monitoring task to finish
+            try:
+                await asyncio.wait_for(monitor_task, timeout=2.0)
+            except:
+                pass
+            # Finalize and save metrics
+            monitor.end_synthesis(success=True)
         
         # Read generated audio
         audio_bytes = output_path.read_bytes()
@@ -250,6 +300,14 @@ async def text_to_speech(
         return response
         
     except Exception as e:
+        # End monitoring with error
+        if monitor and 'monitor_task' in locals():
+            monitor.monitoring_active = False
+            try:
+                await asyncio.wait_for(monitor_task, timeout=1.0)
+            except:
+                pass
+            monitor.end_synthesis(success=False, error=str(e))
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
     
     finally:

@@ -46,6 +46,7 @@ tmp_*/
 
 # IDE
 .vscode/
+.windsurf/
 .idea/
 *.swp
 *.swo
@@ -62,3 +63,7 @@ logs/
 # Cache
 .cache/
 *.cache
+
+# fish-speech
+fish-speech/
+checkpoints/

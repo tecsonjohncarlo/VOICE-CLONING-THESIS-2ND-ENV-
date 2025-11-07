@@ -1,0 +1,14 @@
+{
+  "hardware_tier": "intel_low_end",
+  "device_type": "cuda",
+  "cpu_model": "Intel64 Family 15 Model 107 Stepping 1, GenuineIntel",
+  "cores_physical": 8,
+  "cores_logical": 8,
+  "memory_gb": 63.96110153198242,
+  "gpu_name": "GRID V100D-16A",
+  "gpu_memory_gb": 15.99993896484375,
+  "system": "Windows",
+  "machine": "AMD64",
+  "thermal_capable": false,
+  "avx512_vnni": false
+}

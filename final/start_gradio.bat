@@ -35,7 +35,8 @@ echo Backend is running. Starting Gradio UI...
 REM Suppress NumPy warnings
 set PYTHONWARNINGS=ignore
 
-python ui/gradio_app.py
+REM Use Python from venv312
+venv312\Scripts\python.exe ui/gradio_app.py
 if errorlevel 1 (
     echo.
     echo ERROR: Gradio UI failed to start!

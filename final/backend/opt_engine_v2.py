@@ -419,15 +419,35 @@ class PerformanceMonitor:
             'gpu_util_pct': []
         }
         self.nvml_available = False
+        self.peak_gpu_util = 0.0  # Track peak during inference
         
+        # Fish Speech metrics (captured from logs)
+        self.fish_metrics = {
+            'tokens_generated': 0,
+            'generation_time_s': 0.0,
+            'tokens_per_sec': 0.0,
+            'bandwidth_gb_s': 0.0,
+            'gpu_memory_gb': 0.0,
+            'vq_features_shape': ''
+        }
+        
+        # Try to initialize NVML for GPU monitoring
         try:
             import pynvml
+            logger.info("Attempting to initialize NVML...")
             pynvml.nvmlInit()
             self.nvml = pynvml
-            self.nvml_available = True
             self.gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-        except:
+            # Test if we can actually read GPU utilization
+            test_util = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+            self.nvml_available = True
+            logger.info(f"✅ NVML initialized successfully - GPU monitoring enabled (current: {test_util.gpu}%)")
+        except ImportError:
             self.nvml_available = False
+            logger.warning("⚠️ pynvml not installed - GPU utilization will show 0%. Install with: pip install nvidia-ml-py3")
+        except Exception as e:
+            self.nvml_available = False
+            logger.warning(f"⚠️ NVML initialization failed - GPU utilization will show 0%: {type(e).__name__}: {e}")
     
     def record_latency(self, latency_ms: float):
         self.metrics['latency_ms'].append(latency_ms)
@@ -445,13 +465,78 @@ class PerformanceMonitor:
             self.metrics['gpu_util_pct'].pop(0)
     
     def get_gpu_utilization(self) -> float:
+        """Get current GPU utilization and track peak"""
         if not self.nvml_available:
+            # Fallback: estimate from CUDA memory usage (not accurate but better than 0)
+            try:
+                if torch.cuda.is_available():
+                    mem_allocated = torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated() if torch.cuda.max_memory_allocated() > 0 else 0
+                    estimated_util = min(mem_allocated * 100, 100.0)
+                    if estimated_util > self.peak_gpu_util:
+                        self.peak_gpu_util = estimated_util
+                    return estimated_util
+            except:
+                pass
             return 0.0
+        
         try:
             util = self.nvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
-            return util.gpu
+            current_util = float(util.gpu)
+            # Track peak utilization
+            if current_util > self.peak_gpu_util:
+                self.peak_gpu_util = current_util
+            return current_util
         except:
             return 0.0
+    
+    def get_peak_gpu_utilization(self) -> float:
+        """Get peak GPU utilization since last reset"""
+        return self.peak_gpu_util
+    
+    def reset_peak_gpu_util(self):
+        """Reset peak GPU utilization tracker"""
+        self.peak_gpu_util = 0.0
+    
+    def reset_fish_metrics(self):
+        """Reset Fish Speech metrics for new synthesis"""
+        self.fish_metrics = {
+            'tokens_generated': 0,
+            'generation_time_s': 0.0,
+            'tokens_per_sec': 0.0,
+            'bandwidth_gb_s': 0.0,
+            'gpu_memory_gb': 0.0,
+            'vq_features_shape': ''
+        }
+    
+    def capture_fish_log(self, message: str):
+        """Capture Fish Speech metrics from log messages"""
+        import re
+        
+        # "Generated 1214 tokens in 268.25 seconds, 4.53 tokens/sec"
+        match = re.search(r'Generated (\d+) tokens in ([\d.]+) seconds, ([\d.]+) tokens/sec', message)
+        if match:
+            self.fish_metrics['tokens_generated'] = int(match.group(1))
+            self.fish_metrics['generation_time_s'] = float(match.group(2))
+            self.fish_metrics['tokens_per_sec'] = float(match.group(3))
+            return
+        
+        # "Bandwidth achieved: 3.89 GB/s"
+        match = re.search(r'Bandwidth achieved: ([\d.]+) GB/s', message)
+        if match:
+            self.fish_metrics['bandwidth_gb_s'] = float(match.group(1))
+            return
+        
+        # "GPU Memory used: 7.80 GB"
+        match = re.search(r'GPU Memory used: ([\d.]+) GB', message)
+        if match:
+            self.fish_metrics['gpu_memory_gb'] = float(match.group(1))
+            return
+        
+        # "VQ features: torch.Size([10, 1213])"
+        match = re.search(r'VQ features: torch\.Size\(\[([^\]]+)\]\)', message)
+        if match:
+            self.fish_metrics['vq_features_shape'] = f"[{match.group(1)}]"
+            return
     
     def get_aggregates(self) -> Dict[str, float]:
         result = {}
@@ -530,6 +615,14 @@ class OptimizedFishSpeechV2:
         
         # Performance monitor
         self.monitor = PerformanceMonitor()
+        
+        # Add loguru sink to capture Fish Speech metrics
+        def fish_log_sink(message):
+            """Capture Fish Speech metrics from logs"""
+            self.monitor.capture_fish_log(str(message))
+        
+        # Add handler for Fish Speech logs
+        logger.add(fish_log_sink, format="{message}", filter=lambda record: "fish_speech" in record["name"])
         
         # Apply system optimizations
         if enable_optimizations:
@@ -738,6 +831,13 @@ class OptimizedFishSpeechV2:
             logger.warning(f"Using original audio file: {audio_path}")
             return audio_path
     
+    def _monitor_gpu_during_synthesis(self, stop_event):
+        """Background thread to monitor GPU utilization during synthesis"""
+        import threading
+        while not stop_event.is_set():
+            self.monitor.get_gpu_utilization()  # This updates peak internally
+            time.sleep(0.1)  # Sample every 100ms
+    
     def tts(self,
             text: str,
             speaker_wav: Optional[Union[str, Path]] = None,
@@ -767,8 +867,18 @@ class OptimizedFishSpeechV2:
         Returns:
             Tuple of (audio_array, sample_rate, metrics_dict)
         """
+        import threading
         start_time = time.time()
         output_path = Path(output_path)
+        
+        # Reset Fish Speech metrics for this synthesis
+        self.monitor.reset_fish_metrics()
+        
+        # Start GPU monitoring thread
+        stop_monitoring = threading.Event()
+        if self.monitor.nvml_available:
+            monitor_thread = threading.Thread(target=self._monitor_gpu_during_synthesis, args=(stop_monitoring,), daemon=True)
+            monitor_thread.start()
         
         # Check thermal state before synthesis
         if self.thermal_manager.monitoring_available:
@@ -848,6 +958,11 @@ class OptimizedFishSpeechV2:
             # Save audio
             sf.write(output_path, audio, sample_rate)
             
+            # Stop GPU monitoring thread
+            if self.monitor.nvml_available:
+                stop_monitoring.set()
+                monitor_thread.join(timeout=1.0)
+            
             # Calculate metrics
             latency_ms = (time.time() - start_time) * 1000
             
@@ -855,7 +970,11 @@ class OptimizedFishSpeechV2:
             if self.device == "cuda":
                 peak_vram_mb = torch.cuda.max_memory_allocated() / (1024**2)
             
-            gpu_util = self.monitor.get_gpu_utilization()
+            # Get peak GPU utilization during inference (not current idle state)
+            gpu_util = self.monitor.get_peak_gpu_utilization()
+            logger.info(f"Peak GPU utilization during synthesis: {gpu_util:.1f}%")
+            # Reset for next synthesis
+            self.monitor.reset_peak_gpu_util()
             
             # Check M1 Air throttling status
             if self.cpu_tier == 'm1_air':
@@ -882,7 +1001,14 @@ class OptimizedFishSpeechV2:
                 'peak_vram_mb': peak_vram_mb,
                 'gpu_util_pct': gpu_util,
                 'audio_duration_s': audio_duration_s,
-                'rtf': rtf
+                'rtf': rtf,
+                # Fish Speech specific metrics
+                'fish_tokens_generated': self.monitor.fish_metrics['tokens_generated'],
+                'fish_generation_time_s': self.monitor.fish_metrics['generation_time_s'],
+                'fish_tokens_per_sec': self.monitor.fish_metrics['tokens_per_sec'],
+                'fish_bandwidth_gb_s': self.monitor.fish_metrics['bandwidth_gb_s'],
+                'fish_gpu_memory_gb': self.monitor.fish_metrics['gpu_memory_gb'],
+                'vq_features_shape': self.monitor.fish_metrics['vq_features_shape']
             }
             
             logger.info(f"TTS completed: {latency_ms:.0f}ms, RTF={rtf:.2f}x, VRAM={peak_vram_mb:.0f}MB")

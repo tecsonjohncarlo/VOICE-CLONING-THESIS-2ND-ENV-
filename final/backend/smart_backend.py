@@ -297,20 +297,50 @@ class ConfigurationSelector:
             if self.profile.compute_capability[0] >= 8:  # Ampere+
                 precision = 'bf16'
         
-        # torch.compile requires Triton, which is not available on Windows natively
-        # Auto-enable for:
-        # 1. WSL2 (Linux with Microsoft kernel) - ✅ Has Triton
-        # 2. Native Linux/macOS - ✅ Has Triton
-        # 3. Windows with FORCE_TORCH_COMPILE=1 - User override
-        force_compile = os.getenv('FORCE_TORCH_COMPILE', '0') == '1'
-        use_compile = force_compile or self.is_wsl or (self.profile.system != 'Windows')
+        # torch.compile support:
+        # 1. WSL2 (Linux with Microsoft kernel) - ✅ Has Triton (best performance)
+        # 2. Native Linux/macOS - ✅ Has Triton (best performance)
+        # 3. Windows - ❌ Triton not available, inductor unstable, disabled by default
+        # 4. User override with FORCE_TORCH_COMPILE=1
         
-        if self.is_wsl and self.profile.has_gpu:
-            logger.info("🚀 WSL2 + NVIDIA GPU detected - enabling torch.compile for 20-30% speedup!")
+        force_compile = os.getenv('FORCE_TORCH_COMPILE', '0') == '1'
+        
+        # Smart torch.compile enablement
+        if force_compile:
+            use_compile = True
+            logger.info("🔧 torch.compile FORCED via FORCE_TORCH_COMPILE=1")
+        elif self.is_wsl and self.profile.has_gpu:
+            use_compile = True
+            logger.info("🚀 WSL2 + NVIDIA GPU detected - enabling torch.compile with Triton (20-30% speedup!)")
+        elif self.profile.system != 'Windows':
+            # Linux/macOS with Triton
+            use_compile = True
+            logger.info("🚀 Native Linux/macOS detected - enabling torch.compile with Triton")
+        else:
+            # Windows: Disabled (Triton not available, inductor unstable)
+            use_compile = False
+            logger.info("⚠️ Windows detected: torch.compile disabled (Triton not available, use WSL2 for 20-30% speedup)")
+        
+        # Smart quantization based on GPU tier
+        if self.profile.gpu_memory_gb >= 12:
+            # High-end GPU: No quantization needed (V100, A100, RTX 3090, 4090)
+            quantization = 'none'
+            expected_memory = 6.0  # Full precision model
+            expected_rtf = 0.8  # Faster than real-time
+        elif self.profile.gpu_memory_gb >= 8:
+            # Mid-range GPU: Light quantization (RTX 3060, 4060)
+            quantization = 'int8'
+            expected_memory = 4.0
+            expected_rtf = 1.2
+        else:
+            # Entry-level GPU: Aggressive quantization
+            quantization = 'int8'
+            expected_memory = 3.0
+            expected_rtf = 2.0
         
         # Determine max text length based on GPU tier
         if self.profile.gpu_memory_gb >= 16:
-            max_text = 2000  # High-end GPU (RTX 3090, 4090, A100)
+            max_text = 2000  # High-end GPU (RTX 3090, 4090, A100, V100)
         elif self.profile.gpu_memory_gb >= 8:
             max_text = 1000  # Mid-range GPU (RTX 3060, 4060)
         else:
@@ -319,18 +349,22 @@ class ConfigurationSelector:
         return OptimalConfig(
             device='cuda' if self.profile.device_type == 'cuda' else 'mps',
             precision=precision,
-            quantization='int8',  # Selective quantization
+            quantization=quantization,
             use_onnx=False,  # Not needed for GPU
-            use_torch_compile=use_compile,  # Disabled on Windows (no Triton)
+            use_torch_compile=use_compile,
             chunk_length=1024,  # Large chunks for GPU
             max_batch_size=4,
             num_threads=self.profile.cores_physical // 2,
             cache_limit=100,
             enable_thermal_management=self.profile.thermal_capable,
-            expected_rtf=2.0 if self.profile.gpu_memory_gb >= 8 else 3.5,
-            expected_memory_gb=4.0,
+            expected_rtf=expected_rtf,
+            expected_memory_gb=expected_memory,
             optimization_strategy='gpu_optimized',
-            notes=f'GPU-accelerated with {precision.upper()} precision' + (' + torch.compile' if use_compile else ' (torch.compile disabled on Windows)'),
+            notes=f'GPU-accelerated with {precision.upper()} precision' + (f', {quantization.upper()} quantization' if quantization != 'none' else ', no quantization') + (
+                ' + torch.compile (Triton)' if use_compile else
+                ' (torch.compile disabled - use WSL2 for 20-30% speedup)' if self.profile.system == 'Windows' else
+                ' (torch.compile disabled)'
+            ),
             max_text_length=max_text
         )
     
@@ -816,6 +850,9 @@ class SmartAdaptiveBackend:
         os.environ['ENABLE_TORCH_COMPILE'] = 'true' if self.config.use_torch_compile else 'false'
         os.environ['OMP_NUM_THREADS'] = str(self.config.num_threads)
         os.environ['MKL_NUM_THREADS'] = str(self.config.num_threads)
+        
+        # torch.compile is only enabled on Linux/macOS/WSL2 (has Triton)
+        # No special configuration needed - Triton is available by default
         
         # PyTorch settings
         torch.set_num_threads(self.config.num_threads)
