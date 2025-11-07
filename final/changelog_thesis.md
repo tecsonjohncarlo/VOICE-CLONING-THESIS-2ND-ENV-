@@ -1,5 +1,43 @@
 # Changelog - Thesis Implementation
 
+## [2.2.1] - 2025-11-08 - Fix macOS Hanging Issue
+
+### Fixed - macOS Hanging with torch.compile
+**Why:** torch.compile with MPS backend causes process to hang/freeze during synthesis
+**Logic:** Disable torch.compile on macOS, enable only on Linux/WSL2 with NVIDIA GPUs
+**Benefits:** Stable operation on M1/M2 Macs, no more hanging
+
+**Previous Behavior:**
+- macOS: torch.compile enabled → Process hangs during token generation
+- Spawns 100+ Python processes with MallocStackLogging warnings
+- System becomes unresponsive, requires force quit
+
+**Root Cause:**
+- PyTorch 2.x + MPS + torch.compile is unstable
+- Triton backend incompatible with Apple Silicon
+- Causes infinite process spawning and deadlock
+
+**New Behavior:**
+```python
+elif self.profile.system == 'Darwin':
+    # macOS: torch.compile with MPS is UNSTABLE
+    use_compile = False
+    logger.warning("⚠️ macOS detected: torch.compile disabled (MPS backend unstable)")
+```
+
+**Platform Support:**
+- ✅ Linux + NVIDIA GPU: torch.compile enabled (Triton)
+- ✅ WSL2 + NVIDIA GPU: torch.compile enabled (Triton)
+- ❌ macOS (MPS): torch.compile disabled (unstable)
+- ❌ Windows: torch.compile disabled (no Triton)
+
+**Performance Impact on M1 Air:**
+- Without torch.compile: RTF ~2.0x (slower but stable)
+- With torch.compile: System hangs (unusable)
+- Trade-off: Stability > Speed
+
+---
+
 ## [2.2.0] - 2025-11-08 - Smart torch.compile + GPU-Tier Quantization + Comprehensive Monitoring
 
 ### Fixed - Smart Quantization Based on GPU Tier

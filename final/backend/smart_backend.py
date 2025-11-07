@@ -299,9 +299,10 @@ class ConfigurationSelector:
         
         # torch.compile support:
         # 1. WSL2 (Linux with Microsoft kernel) - ✅ Has Triton (best performance)
-        # 2. Native Linux/macOS - ✅ Has Triton (best performance)
-        # 3. Windows - ❌ Triton not available, inductor unstable, disabled by default
-        # 4. User override with FORCE_TORCH_COMPILE=1
+        # 2. Native Linux (NVIDIA GPU) - ✅ Has Triton (best performance)
+        # 3. macOS (MPS) - ❌ UNSTABLE - causes hanging/freezing
+        # 4. Windows - ❌ Triton not available, inductor unstable, disabled by default
+        # 5. User override with FORCE_TORCH_COMPILE=1
         
         force_compile = os.getenv('FORCE_TORCH_COMPILE', '0') == '1'
         
@@ -312,14 +313,22 @@ class ConfigurationSelector:
         elif self.is_wsl and self.profile.has_gpu:
             use_compile = True
             logger.info("🚀 WSL2 + NVIDIA GPU detected - enabling torch.compile with Triton (20-30% speedup!)")
-        elif self.profile.system != 'Windows':
-            # Linux/macOS with Triton
+        elif self.profile.system == 'Linux' and self.profile.device_type == 'cuda':
+            # Native Linux with NVIDIA GPU
             use_compile = True
-            logger.info("🚀 Native Linux/macOS detected - enabling torch.compile with Triton")
-        else:
+            logger.info("🚀 Linux + NVIDIA GPU detected - enabling torch.compile with Triton")
+        elif self.profile.system == 'Darwin':
+            # macOS: torch.compile with MPS is UNSTABLE (causes hanging)
+            use_compile = False
+            logger.warning("⚠️ macOS detected: torch.compile disabled (MPS backend unstable, causes hanging)")
+        elif self.profile.system == 'Windows':
             # Windows: Disabled (Triton not available, inductor unstable)
             use_compile = False
             logger.info("⚠️ Windows detected: torch.compile disabled (Triton not available, use WSL2 for 20-30% speedup)")
+        else:
+            # Unknown platform: disable for safety
+            use_compile = False
+            logger.warning(f"⚠️ Unknown platform ({self.profile.system}): torch.compile disabled for safety")
         
         # Smart quantization based on GPU tier
         if self.profile.gpu_memory_gb >= 12:
