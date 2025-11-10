@@ -33,7 +33,7 @@ python-multipart>=0.0.6
 
 # UI frameworks
 gradio>=5.0.0
-streamlit>=1.28.0
+streamlit>=1.32.0  # Requires protobuf>=3.20, compatible with newer descript-audiotools
 
 # Audio processing
 soundfile>=0.12.0
@@ -41,7 +41,8 @@ librosa>=0.10.1
 pydub>=0.25.0
 resampy>=0.4.3
 descript-audio-codec
-descript-audiotools  # Provides 'audiotools' module required by Fish Speech DAC
+descript-audiotools>=0.8.0  # Newer version compatible with protobuf>=3.20
+protobuf>=3.20,<5  # Explicit version to resolve conflict
 
 # NumPy (Fish Speech requires <=1.26.4)
 numpy<=1.26.4
