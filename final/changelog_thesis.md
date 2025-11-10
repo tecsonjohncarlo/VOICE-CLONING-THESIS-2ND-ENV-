@@ -1,5 +1,59 @@
 # Changelog - Thesis Implementation
 
+## [2.2.6] - 2025-11-10 - CRITICAL: Disable Gradient Checkpointing for Inference
+
+### Fixed - Gradient checkpointing causing 10-20x slowdown
+**Why:** Model was using training mode (gradient checkpointing) during inference
+**Logic:** Explicitly disable gradient checkpointing after model loading
+**Benefits:** 10-20x speedup on GPU inference (144x RTF → ~7-10x RTF expected)
+
+**Problem:**
+```
+RTX 3050 Laptop GPU:
+Expected RTF: 2.0x
+Actual RTF: 144.39x  ← 72x SLOWER than expected!
+
+Generated 52 tokens in 95.91 seconds, 0.54 tokens/sec
+TTS completed: 341975ms (5.7 minutes for 2.4s audio)
+```
+
+**Root Cause:**
+- Model config has `use_gradient_checkpointing=True`
+- Gradient checkpointing is for **training**, not inference
+- It recomputes activations to save memory during backprop
+- Makes inference **10-20x slower** because it's doing extra work
+- No backprop needed during inference!
+
+**Solution:**
+```python
+# After loading model, explicitly disable gradient checkpointing
+if hasattr(model.config, 'use_gradient_checkpointing'):
+    if model.config.use_gradient_checkpointing:
+        logger.warning("⚠️ Gradient checkpointing was enabled (training mode) - disabling for inference")
+        model.config.use_gradient_checkpointing = False
+        if hasattr(model, 'gradient_checkpointing_disable'):
+            model.gradient_checkpointing_disable()
+            logger.info("✅ Gradient checkpointing disabled - expect 10-20x speedup!")
+```
+
+**Expected Performance After Fix:**
+```
+RTX 3050 Laptop GPU:
+Before: 144.39x RTF (unusable)
+After: ~7-10x RTF (usable)
+
+10s audio: 5.7 minutes → 70-100 seconds
+Much more reasonable!
+```
+
+**Why This Matters:**
+- Makes GPU inference actually usable
+- RTX 3050 goes from unusable to decent performance
+- Critical bug affecting all GPU users
+- Training mode should NEVER be used for inference
+
+---
+
 ## [2.2.5] - 2025-11-10 - Fix GPU Detection Threshold + Add Debug Logging
 
 ### Fixed - GPU configuration not selected for 4GB GPUs

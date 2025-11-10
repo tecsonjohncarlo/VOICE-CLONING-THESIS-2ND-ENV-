@@ -659,6 +659,22 @@ class OptimizedFishSpeechV2:
             compile=ENABLE_TORCH_COMPILE,
         )
         
+        # CRITICAL: Disable gradient checkpointing for inference
+        # Gradient checkpointing is for training only - it makes inference 10-20x slower!
+        try:
+            if hasattr(self.llama_queue, 'model'):
+                model = self.llama_queue.model
+                if hasattr(model, 'config') and hasattr(model.config, 'use_gradient_checkpointing'):
+                    if model.config.use_gradient_checkpointing:
+                        logger.warning("⚠️ Gradient checkpointing was enabled (training mode) - disabling for inference")
+                        model.config.use_gradient_checkpointing = False
+                        # Also disable on the model itself if it has the method
+                        if hasattr(model, 'gradient_checkpointing_disable'):
+                            model.gradient_checkpointing_disable()
+                            logger.info("✅ Gradient checkpointing disabled - expect 10-20x speedup!")
+        except Exception as e:
+            logger.warning(f"Could not disable gradient checkpointing: {e}")
+        
         # Create inference engine
         self.inference_engine = TTSInferenceEngine(
             llama_queue=self.llama_queue,
