@@ -565,3 +565,54 @@ class UniversalFishSpeechOptimizer:
     def get_performance_summary(self) -> Dict[str, Any]:
         """Get performance summary"""
         return self.performance_tracker.get_average_performance()
+    
+    def tts(self, text: str, speaker_wav: str = None, **kwargs):
+        """
+        TTS method for compatibility with SmartAdaptiveBackend
+        Delegates to synthesize() method
+        """
+        return self.synthesize(text=text, reference_audio=speaker_wav, **kwargs)
+    
+    def get_health(self) -> Dict[str, Any]:
+        """
+        Health check method for compatibility with SmartAdaptiveBackend
+        Returns system health status
+        """
+        try:
+            import psutil
+            
+            # Get base engine health if available
+            base_health = {}
+            if hasattr(self.base_engine, 'get_health'):
+                base_health = self.base_engine.get_health()
+            
+            # Add system metrics
+            memory = psutil.virtual_memory()
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            
+            health = {
+                'status': 'healthy',
+                'engine': 'UniversalFishSpeechOptimizer',
+                'tier': self.config.get('detected_tier', 'unknown'),
+                'device': self.config.get('device', 'unknown'),
+                'onnx_enabled': self.onnx_optimizer is not None,
+                'system': {
+                    'cpu_percent': cpu_percent,
+                    'memory_percent': memory.percent,
+                    'memory_available_gb': memory.available / (1024**3)
+                }
+            }
+            
+            # Merge with base engine health
+            if base_health:
+                health['base_engine'] = base_health
+            
+            return health
+            
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return {
+                'status': 'error',
+                'error': str(e),
+                'engine': 'UniversalFishSpeechOptimizer'
+            }

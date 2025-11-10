@@ -1,5 +1,132 @@
 # Changelog - Thesis Implementation
 
+## [2.2.4] - 2025-11-10 - Fix UniversalOptimizer API Compatibility
+
+### Fixed - Missing tts() and get_health() methods
+**Why:** UniversalFishSpeechOptimizer missing methods causing AttributeError on CPU-only devices
+**Logic:** Add wrapper methods for SmartAdaptiveBackend compatibility
+**Benefits:** CPU-only devices work correctly, consistent API across all engines
+
+**Error:**
+```
+AttributeError: 'UniversalFishSpeechOptimizer' object has no attribute 'get_health'
+AttributeError: 'UniversalFishSpeechOptimizer' object has no attribute 'tts'
+```
+
+**Root Cause:**
+- `UniversalFishSpeechOptimizer` used on CPU-only devices (no GPU)
+- Only had `synthesize()` method, not `tts()`
+- Missing `get_health()` for health check endpoint
+- `SmartAdaptiveBackend` expected consistent API
+
+**Solution:**
+```python
+def tts(self, text: str, speaker_wav: str = None, **kwargs):
+    """TTS method for compatibility - delegates to synthesize()"""
+    return self.synthesize(text=text, reference_audio=speaker_wav, **kwargs)
+
+def get_health(self) -> Dict[str, Any]:
+    """Health check method for compatibility"""
+    return {
+        'status': 'healthy',
+        'engine': 'UniversalFishSpeechOptimizer',
+        'tier': self.config.get('detected_tier'),
+        'device': self.config.get('device'),
+        'onnx_enabled': self.onnx_optimizer is not None,
+        'system': {
+            'cpu_percent': cpu_percent,
+            'memory_percent': memory.percent,
+            'memory_available_gb': memory.available / (1024**3)
+        }
+    }
+```
+
+**Now Works On:**
+- ✅ CPU-only devices (Intel low-end, ARM SBC)
+- ✅ GPU devices (CUDA, MPS)
+- ✅ All optimization strategies
+- ✅ Health check endpoint
+- ✅ TTS endpoint
+
+**Why This Matters:**
+- CPU-only devices can now run the backend
+- Consistent API across all engine types
+- Health monitoring works on all devices
+- No more AttributeError crashes
+
+---
+
+## [2.2.3] - 2025-11-10 - Complete Requirements and Dependencies
+
+### Updated - Comprehensive requirements.txt
+**Why:** Missing Fish Speech dependencies causing import errors
+**Logic:** Include all Fish Speech core dependencies from pyproject.toml
+**Benefits:** One-command installation, no missing dependencies
+
+**Added Dependencies:**
+```
+# Fish Speech core (previously missing)
+transformers>=4.45.2
+datasets==2.18.0
+lightning>=2.1.0
+hydra-core>=1.3.2
+tensorboard>=2.14.1
+natsort>=8.4.0
+einops>=0.7.0
+rich>=13.5.3
+wandb>=0.15.11
+grpcio>=1.58.0
+kui>=1.6.0
+loguru>=0.6.0
+loralib>=0.1.2
+pyrootutils>=1.0.4
+einx[torch]==0.2.2
+zstandard>=0.22.0
+modelscope==1.17.1
+opencc-python-reimplemented==0.1.7
+silero-vad
+ormsgpack
+tiktoken>=0.8.0
+pydantic==2.9.2
+cachetools
+descript-audio-codec
+descript-audiotools
+resampy>=0.4.3
+```
+
+**Installation Instructions:**
+```bash
+# 1. Install PyTorch (hardware-specific)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# 2. Install all dependencies
+pip install -r requirements.txt
+
+# 3. Install Fish Speech
+cd fish-speech && pip install -e .
+```
+
+**Key Fixes:**
+- **numpy<=1.26.4**: Fish Speech requires this specific version
+- **pydantic==2.9.2**: Exact version for compatibility
+- **datasets==2.18.0**: Required for Fish Speech training
+- **einx[torch]==0.2.2**: Tensor operations
+- **pyrootutils>=1.0.4**: Required for Fish Speech imports
+
+**Troubleshooting Section:**
+- CUDA out of memory → Enable quantization
+- numpy version conflict → Force reinstall
+- transformers version conflict → Upgrade
+- pydantic version conflict → Force reinstall
+
+**Why This Matters:**
+- No more "ModuleNotFoundError"
+- Clean installation process
+- Hardware-specific PyTorch instructions
+- Complete dependency resolution
+
+---
+
 ## [2.2.2] - 2025-11-10 - Comprehensive Environment Configuration
 
 ### Added - Complete .env_example with CUDA Installation Guide
