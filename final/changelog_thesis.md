@@ -1,5 +1,88 @@
 # Changelog - Thesis Implementation
 
+## [2.2.2] - 2025-11-10 - Comprehensive Environment Configuration
+
+### Added - Complete .env_example with CUDA Installation Guide
+**Why:** Users need clear guidance for different hardware configurations
+**Logic:** Comprehensive environment template with hardware-specific recommendations
+**Benefits:** Easy setup for any hardware (GPU/CPU/multi-GPU), CUDA installation help
+
+**New File:** `.env_example`
+
+**Features:**
+1. **Device Configuration**
+   - Auto-detection (recommended)
+   - Manual override (cuda/mps/cpu)
+   - Multi-GPU support (CUDA_VISIBLE_DEVICES)
+
+2. **Performance Tuning**
+   - Mixed precision (fp16/bf16/fp32)
+   - Quantization (none/int8)
+   - torch.compile settings
+   - CPU thread control
+
+3. **Memory Management**
+   - Memory budget configuration
+   - Cache settings
+   - OOM prevention
+
+4. **CUDA Installation Guide**
+   - Windows installation steps
+   - Linux (Ubuntu/Debian) commands
+   - WSL2 setup instructions
+   - PyTorch CUDA installation
+   - Verification commands
+   - Troubleshooting tips
+
+5. **Hardware-Specific Recommendations**
+   - High-end GPU (RTX 3090/4090, V100): RTF 0.8x
+   - Mid-range GPU (RTX 3060/4060): RTF 1.2x
+   - Low-end GPU (GTX 1660): RTF 2.0x
+   - Apple Silicon (M1/M2/M3): RTF 2.0x
+   - CPU-only: RTF 10-20x
+   - Multi-GPU setup
+
+**Example Configurations:**
+
+```bash
+# High-end NVIDIA GPU
+DEVICE=cuda
+MIXED_PRECISION=fp16
+QUANTIZATION=none
+ENABLE_TORCH_COMPILE=auto
+
+# CPU-only (no GPU)
+DEVICE=cpu
+MIXED_PRECISION=fp32
+QUANTIZATION=int8
+OMP_NUM_THREADS=8
+
+# Multi-GPU (use second GPU)
+CUDA_VISIBLE_DEVICES=1
+DEVICE=cuda
+```
+
+**CUDA Installation (Linux):**
+```bash
+# CUDA 12.1 (RTX 3000/4000 series)
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
+sudo dpkg -i cuda-keyring_1.0-1_all.deb
+sudo apt-get update
+sudo apt-get -y install cuda-toolkit-12-1
+
+# PyTorch with CUDA
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+```
+
+**Benefits:**
+- Clear setup instructions for any hardware
+- Prevents common configuration mistakes
+- CUDA installation guidance
+- Hardware-specific optimization recommendations
+- Multi-GPU support documentation
+
+---
+
 ## [2.2.1] - 2025-11-08 - Fix macOS Hanging Issue
 
 ### Fixed - macOS Hanging with torch.compile
