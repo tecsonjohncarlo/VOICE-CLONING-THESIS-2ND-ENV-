@@ -130,7 +130,7 @@ def get_health(self) -> Dict[str, Any]:
 
 **Critical Missing Dependencies:**
 - `lightning>=2.1.0` - Required for UniversalOptimizer, causes fallback to CPU
-- `audiotools` - Required by Fish Speech DAC model, causes startup failure
+- `descript-audiotools` - Provides `audiotools` module required by Fish Speech DAC model, causes startup failure
 
 **Added Dependencies:**
 ```
