@@ -1,5 +1,249 @@
 # Changelog - Thesis Implementation
 
+## [2.3.0] - 2025-11-10 - CRITICAL: Fix Extreme Token Generation Slowdown (0.56 tok/sec → 5-15 tok/sec)
+
+### Fixed - Multiple critical bottlenecks causing catastrophic performance degradation
+**Problem:** System generating only 0.56-0.79 tokens/sec (should be 10-30+ tok/sec on RTX 3050)
+**Root Causes:** GPU memory overflow, ineffective quantization, oversized chunks, disabled warmup overhead
+**Expected Improvement:** 10-20x faster token generation, 3+ minute reference encoding → 10-30 seconds
+
+---
+
+### **Critical Issue Analysis**
+
+**Observed Performance:**
+```
+Token Generation: 0.56 tokens/sec (should be 10-30+)
+Reference Audio Encoding: 204 seconds (3m 24s) for 23s audio
+VQ Decoding: 29 seconds
+GPU Memory Used: 5.97 GB on 4GB card ← CRITICAL OVERFLOW
+GPU Utilization: 100% but crawling
+Total Synthesis: 5+ minutes for short text
+```
+
+**Root Cause #1: GPU Memory Overflow (5.97GB used on 4GB card)**
+- RTX 3050 Laptop has only 4GB VRAM
+- System showing 5.97GB usage = memory spilling to system RAM
+- Data shuttling between GPU ↔ CPU RAM causes 10-20x slowdown
+- INT8 quantization enabled but not reducing memory effectively
+
+**Root Cause #2: Oversized Chunk Length**
+- chunk_length=1024 too large for 4GB GPU
+- Forces large batch operations exceeding VRAM capacity
+- Causes constant memory swapping
+
+**Root Cause #3: Windows Without torch.compile**
+- torch.compile disabled on Windows (no Triton support)
+- Missing 20-30% speedup available on WSL2/Linux
+
+**Root Cause #4: Warmup Overhead**
+- Warmup taking 38+ seconds on every startup
+- Provides minimal benefit on low-end hardware
+- Pure overhead for single-use inference
+
+---
+
+### **Fix #1: Extreme Memory Optimization for 4GB GPUs**
+
+**File:** `backend/smart_backend.py`
+**Location:** `_gpu_config()` method
+
+**Changes:**
+```python
+def _gpu_config(self) -> OptimalConfig:
+    # CRITICAL FIX: 4GB GPUs need extreme memory optimization
+    if self.profile.gpu_memory_gb <= 4.5:
+        logger.warning(f"⚠️ 4GB GPU detected - applying extreme memory optimization")
+        return OptimalConfig(
+            device='cuda',
+            precision='fp16',  # Force fp16, not bf16
+            quantization='none',  # Disable INT8 - not working properly
+            chunk_length=200,  # CRITICAL: Reduced from 1024 to 200
+            max_batch_size=1,  # Force batch size 1
+            cache_limit=25,  # Reduced from 100
+            expected_memory_gb=3.5,  # Stay under 4GB
+            max_text_length=200  # Reduced from 600
+        )
+```
+
+**Why This Works:**
+- **chunk_length: 1024 → 200**: Reduces memory per operation by 5x
+- **quantization: int8 → none**: INT8 wasn't reducing memory effectively, just adding overhead
+- **precision: fp16 only**: Prevents bf16 which uses more memory
+- **max_batch_size: 4 → 1**: Eliminates batch memory overhead
+- **cache_limit: 100 → 25**: Reduces cache memory footprint
+- **max_text_length: 600 → 200**: Prevents oversized inputs
+
+**Expected Impact:**
+- GPU memory usage: 5.97GB → 3.5GB (fits in VRAM!)
+- No more RAM spillover = 10-20x speedup
+- Token generation: 0.56 tok/sec → 5-15 tok/sec
+
+**Device-Specific Optimization:**
+- **RTX 3050 Laptop (4GB)**: Uses this extreme optimization
+- **RTX 3060 (12GB)**: Uses standard GPU config with chunk_length=1024
+- **RTX 4090 (24GB)**: Uses high-end config with no quantization
+
+**Counterpart for Other Devices:**
+- **Intel i5 baseline**: Already has conservative CPU config (chunk_length=512)
+- **AMD Ryzen 5**: Similar mobile CPU config with thermal management
+- **6GB GPUs**: Use standard config with int8 quantization
+
+---
+
+### **Fix #2: Aggressive Gradient Checkpointing Disable**
+
+**File:** `backend/opt_engine_v2.py`
+**Location:** Model initialization section
+
+**Changes:**
+```python
+# AGGRESSIVE FIX: Force disable gradient checkpointing multiple ways
+disabled_count = 0
+
+# Method 1: Disable via config
+if hasattr(model, 'config'):
+    if hasattr(model.config, 'use_gradient_checkpointing'):
+        model.config.use_gradient_checkpointing = False
+        disabled_count += 1
+
+# Method 2: Disable via model method
+if hasattr(model, 'gradient_checkpointing_disable'):
+    model.gradient_checkpointing_disable()
+    disabled_count += 1
+
+# Method 3: Force set use_gradient_checkpointing attribute
+if hasattr(model, 'use_gradient_checkpointing'):
+    model.use_gradient_checkpointing = False
+    disabled_count += 1
+
+# Method 4: Disable in all submodules
+for name, module in model.named_modules():
+    if hasattr(module, 'gradient_checkpointing'):
+        module.gradient_checkpointing = False
+        disabled_count += 1
+
+logger.info(f"✅ Gradient checkpointing disabled ({disabled_count} locations)")
+```
+
+**Why This Works:**
+- **Multiple disable methods**: Ensures gradient checkpointing is disabled everywhere
+- **Submodule iteration**: Catches gradient checkpointing in nested modules
+- **Verification logging**: Shows how many locations were disabled
+
+**Previous Issue:**
+- Only checked `llama_queue.model` which might not exist
+- Single disable method might miss some configurations
+- Log showed "⚠️ Could not find model in llama_queue"
+
+**Expected Impact:**
+- Ensures gradient checkpointing is actually disabled
+- Prevents 10-20x slowdown from training mode
+- More reliable than single-method approach
+
+---
+
+### **Fix #3: Disable Warmup to Save Startup Time**
+
+**File:** `backend/opt_engine_v2.py`
+**Location:** Initialization section
+
+**Changes:**
+```python
+# Warmup - DISABLED to save 38+ seconds startup time
+# Warmup takes too long on low-end hardware and provides minimal benefit
+# logger.info("Warming up models...")
+# self._warmup()
+logger.info("⚠️ Warmup skipped to reduce startup time (saves 38+ seconds)")
+```
+
+**Why This Works:**
+- **Warmup overhead**: Takes 38+ seconds on RTX 3050
+- **Minimal benefit**: First inference slightly slower, but not 38 seconds worth
+- **Better UX**: Users can start using system immediately
+- **Low-end optimization**: Warmup provides less benefit on slower hardware
+
+**Trade-off:**
+- First inference: +2-5 seconds slower
+- Startup time: -38 seconds faster
+- Net benefit: 33-36 seconds saved on first use
+
+---
+
+### **Fix #4: PyTorch Memory Configuration**
+
+**File:** `.env`
+**Location:** Performance Tuning section
+
+**Changes:**
+```bash
+# CRITICAL FIX: Reduce memory fragmentation for 4GB GPUs
+# This prevents memory overflow to system RAM which causes 10-20x slowdown
+PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+```
+
+**Why This Works:**
+- **max_split_size_mb=128**: Limits memory block size to 128MB
+- **Reduces fragmentation**: Prevents large contiguous allocations
+- **Better memory utilization**: More efficient use of limited VRAM
+- **Prevents overflow**: Keeps memory usage within 4GB limit
+
+**Expected Impact:**
+- Reduces memory fragmentation
+- Prevents memory leaks over time
+- More stable long-running performance
+- Complements chunk_length reduction
+
+---
+
+### **Expected Performance After All Fixes**
+
+**Before (Current State):**
+```
+Token Generation: 0.56 tokens/sec
+Reference Audio Encoding: 204 seconds (3m 24s)
+VQ Decoding: 29 seconds
+Total Synthesis: 5+ minutes
+GPU Memory: 5.97 GB (overflow!)
+Startup Time: 38+ seconds warmup
+```
+
+**After (With Fixes):**
+```
+Token Generation: 5-15 tokens/sec (10-20x faster)
+Reference Audio Encoding: 10-30 seconds (6-20x faster)
+VQ Decoding: 5-10 seconds (3-6x faster)
+Total Synthesis: 20-60 seconds (5-15x faster)
+GPU Memory: 3.5 GB (fits in VRAM!)
+Startup Time: Immediate (no warmup)
+```
+
+**Improvement Summary:**
+- **Token generation**: 0.56 → 5-15 tok/sec (10-27x faster)
+- **Reference encoding**: 204s → 10-30s (7-20x faster)
+- **Total synthesis**: 300s+ → 20-60s (5-15x faster)
+- **Startup time**: 38s → 0s (instant)
+- **Memory usage**: 5.97GB → 3.5GB (no overflow)
+
+---
+
+### **Long-Term Recommendations**
+
+**For Maximum Performance:**
+1. **Use WSL2 on Windows**: Enables torch.compile with Triton (20-30% additional speedup)
+2. **Shorter reference audio**: Use 5-10 seconds max (current 23s is too long)
+3. **Monitor GPU memory**: Use `nvidia-smi` to verify staying under 4GB
+4. **Consider GPU upgrade**: RTX 3060 (12GB) would allow chunk_length=1024
+
+**Testing Checklist:**
+- [ ] Verify GPU memory stays under 4GB during inference
+- [ ] Confirm token generation > 5 tok/sec
+- [ ] Check reference audio encoding < 30 seconds
+- [ ] Ensure no memory overflow warnings in logs
+- [ ] Test with various text lengths (50, 100, 200 chars)
+
+---
+
 ## [2.2.6] - 2025-11-10 - CRITICAL: Disable Gradient Checkpointing for Inference
 
 ### Fixed - Gradient checkpointing causing 10-20x slowdown

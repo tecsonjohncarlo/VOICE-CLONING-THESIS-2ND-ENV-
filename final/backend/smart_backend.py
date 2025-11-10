@@ -301,6 +301,28 @@ class ConfigurationSelector:
     
     def _gpu_config(self) -> OptimalConfig:
         """Configuration for GPU inference"""
+        # CRITICAL FIX: 4GB GPUs need extreme memory optimization
+        # RTX 3050 Laptop (4GB) was using 5.97GB causing memory overflow to RAM
+        if self.profile.gpu_memory_gb <= 4.5:
+            logger.warning(f"⚠️ 4GB GPU detected ({self.profile.gpu_name}) - applying extreme memory optimization")
+            return OptimalConfig(
+                device='cuda',
+                precision='fp16',  # Force fp16, not bf16
+                quantization='none',  # Disable INT8 - not reducing memory effectively
+                use_onnx=False,
+                use_torch_compile=False,  # Disabled on Windows
+                chunk_length=200,  # CRITICAL: Reduced from 1024 to 200
+                max_batch_size=1,  # Force batch size 1
+                num_threads=4,
+                cache_limit=25,  # Reduced from 100
+                enable_thermal_management=self.profile.thermal_capable,
+                expected_rtf=5.0,  # More realistic for 4GB GPU
+                expected_memory_gb=3.5,  # Stay under 4GB
+                optimization_strategy='extreme_4gb_optimization',
+                notes='⚠️ Extreme memory optimization for 4GB VRAM - chunk_length=200, no quantization, fp16 only',
+                max_text_length=200  # CRITICAL: Reduced from 600 to 200
+            )
+        
         # Determine precision based on compute capability
         precision = 'fp16'
         if self.profile.device_type == 'cuda' and self.profile.compute_capability:
@@ -352,9 +374,9 @@ class ConfigurationSelector:
             expected_memory = 4.0
             expected_rtf = 1.2
         else:
-            # Entry-level GPU: Aggressive quantization
+            # Entry-level GPU (6GB): Moderate quantization
             quantization = 'int8'
-            expected_memory = 3.0
+            expected_memory = 4.5
             expected_rtf = 2.0
         
         # Determine max text length based on GPU tier
@@ -363,7 +385,7 @@ class ConfigurationSelector:
         elif self.profile.gpu_memory_gb >= 8:
             max_text = 1000  # Mid-range GPU (RTX 3060, 4060)
         else:
-            max_text = 600   # Entry-level GPU
+            max_text = 600   # Entry-level GPU (6GB+)
         
         return OptimalConfig(
             device='cuda' if self.profile.device_type == 'cuda' else 'mps',

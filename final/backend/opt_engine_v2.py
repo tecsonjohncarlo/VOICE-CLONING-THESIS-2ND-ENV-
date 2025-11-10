@@ -673,26 +673,39 @@ class OptimizedFishSpeechV2:
                 logger.debug(f"Found model via llama_queue._model: {type(model)}")
             
             if model is not None:
-                # Check if gradient checkpointing is enabled
+                # AGGRESSIVE FIX: Force disable gradient checkpointing multiple ways
+                disabled_count = 0
+                
+                # Method 1: Disable via config
                 if hasattr(model, 'config'):
                     logger.debug(f"Model config attributes: {dir(model.config)}")
                     if hasattr(model.config, 'use_gradient_checkpointing'):
-                        if model.config.use_gradient_checkpointing:
-                            logger.warning("⚠️ Gradient checkpointing was enabled (training mode) - disabling for inference")
-                            model.config.use_gradient_checkpointing = False
-                            
-                            # Also disable on the model itself
-                            if hasattr(model, 'gradient_checkpointing_disable'):
-                                model.gradient_checkpointing_disable()
-                                logger.info("✅ Gradient checkpointing disabled via method - expect 10-20x speedup!")
-                            else:
-                                logger.info("✅ Gradient checkpointing disabled in config")
-                        else:
-                            logger.info("✅ Gradient checkpointing already disabled")
-                    else:
-                        logger.warning("⚠️ Model config has no use_gradient_checkpointing attribute")
+                        model.config.use_gradient_checkpointing = False
+                        disabled_count += 1
+                        logger.info("✅ Gradient checkpointing disabled in config")
+                
+                # Method 2: Disable via model method
+                if hasattr(model, 'gradient_checkpointing_disable'):
+                    model.gradient_checkpointing_disable()
+                    disabled_count += 1
+                    logger.info("✅ Gradient checkpointing disabled via method")
+                
+                # Method 3: Force set use_gradient_checkpointing attribute
+                if hasattr(model, 'use_gradient_checkpointing'):
+                    model.use_gradient_checkpointing = False
+                    disabled_count += 1
+                    logger.info("✅ Gradient checkpointing disabled via attribute")
+                
+                # Method 4: Disable in all submodules
+                for name, module in model.named_modules():
+                    if hasattr(module, 'gradient_checkpointing'):
+                        module.gradient_checkpointing = False
+                        disabled_count += 1
+                
+                if disabled_count > 0:
+                    logger.info(f"✅ Gradient checkpointing disabled ({disabled_count} locations) - expect 10-20x speedup!")
                 else:
-                    logger.warning("⚠️ Model has no config attribute")
+                    logger.warning("⚠️ Could not find gradient checkpointing settings")
             else:
                 logger.warning("⚠️ Could not find model in llama_queue")
         except Exception as e:
@@ -706,9 +719,11 @@ class OptimizedFishSpeechV2:
             precision=self.precision,
         )
         
-        # Warmup
-        logger.info("Warming up models...")
-        self._warmup()
+        # Warmup - DISABLED to save 38+ seconds startup time
+        # Warmup takes too long on low-end hardware and provides minimal benefit
+        # logger.info("Warming up models...")
+        # self._warmup()
+        logger.info("⚠️ Warmup skipped to reduce startup time (saves 38+ seconds)")
         
         logger.info("✅ OptimizedFishSpeechV2 initialized successfully!")
     
