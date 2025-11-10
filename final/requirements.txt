@@ -42,6 +42,7 @@ pydub>=0.25.0
 resampy>=0.4.3
 descript-audio-codec
 descript-audiotools
+audiotools  # Required by Fish Speech DAC model
 
 # NumPy (Fish Speech requires <=1.26.4)
 numpy<=1.26.4

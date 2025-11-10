@@ -576,7 +576,7 @@ class UniversalFishSpeechOptimizer:
     def get_health(self) -> Dict[str, Any]:
         """
         Health check method for compatibility with SmartAdaptiveBackend
-        Returns system health status
+        Returns system health status matching HealthResponse schema
         """
         try:
             import psutil
@@ -584,28 +584,40 @@ class UniversalFishSpeechOptimizer:
             # Get base engine health if available
             base_health = {}
             if hasattr(self.base_engine, 'get_health'):
-                base_health = self.base_engine.get_health()
+                try:
+                    base_health = self.base_engine.get_health()
+                except:
+                    pass
             
             # Add system metrics
             memory = psutil.virtual_memory()
             cpu_percent = psutil.cpu_percent(interval=0.1)
             
+            # Build health response matching HealthResponse schema
             health = {
                 'status': 'healthy',
-                'engine': 'UniversalFishSpeechOptimizer',
-                'tier': self.config.get('detected_tier', 'unknown'),
-                'device': self.config.get('device', 'unknown'),
-                'onnx_enabled': self.onnx_optimizer is not None,
-                'system': {
+                'device': self.config.get('device', 'cpu'),
+                'system_info': {
+                    'engine': 'UniversalFishSpeechOptimizer',
+                    'tier': self.config.get('detected_tier', 'unknown'),
+                    'onnx_enabled': self.onnx_optimizer is not None,
                     'cpu_percent': cpu_percent,
                     'memory_percent': memory.percent,
-                    'memory_available_gb': memory.available / (1024**3)
+                    'memory_available_gb': round(memory.available / (1024**3), 2),
+                    'memory_used_gb': round(memory.used / (1024**3), 2),
+                    'memory_total_gb': round(memory.total / (1024**3), 2)
+                },
+                'cache_stats': {
+                    'enabled': False,
+                    'size': 0,
+                    'hits': 0,
+                    'misses': 0
                 }
             }
             
-            # Merge with base engine health
+            # Add base engine health if available
             if base_health:
-                health['base_engine'] = base_health
+                health['system_info']['base_engine'] = base_health
             
             return health
             
@@ -613,6 +625,13 @@ class UniversalFishSpeechOptimizer:
             logger.error(f"Health check failed: {e}")
             return {
                 'status': 'error',
-                'error': str(e),
-                'engine': 'UniversalFishSpeechOptimizer'
+                'device': 'unknown',
+                'system_info': {
+                    'error': str(e),
+                    'engine': 'UniversalFishSpeechOptimizer'
+                },
+                'cache_stats': {
+                    'enabled': False,
+                    'size': 0
+                }
             }

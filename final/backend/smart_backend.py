@@ -271,8 +271,18 @@ class ConfigurationSelector:
         """Select best configuration for detected hardware"""
         
         # GPU-based configuration
-        if self.profile.has_gpu and self.profile.gpu_memory_gb >= 4:
+        # Use 3.5GB threshold to account for floating point precision and usable VRAM
+        # RTX 3050 (4GB), RTX 3060 (12GB), etc. should all qualify
+        logger.debug(f"GPU check: has_gpu={self.profile.has_gpu}, gpu_memory_gb={self.profile.gpu_memory_gb:.2f}")
+        if self.profile.has_gpu and self.profile.gpu_memory_gb >= 3.5:
+            logger.info(f"✅ GPU configuration selected (GPU: {self.profile.gpu_name}, {self.profile.gpu_memory_gb:.2f}GB VRAM)")
             return self._gpu_config()
+        
+        # Log why GPU wasn't selected
+        if self.profile.has_gpu:
+            logger.warning(f"⚠️ GPU detected but insufficient VRAM: {self.profile.gpu_memory_gb:.2f}GB < 3.5GB required")
+        else:
+            logger.info("ℹ️ No GPU detected, using CPU configuration")
         
         # CPU-based configuration by tier
         tier_configs = {
