@@ -661,19 +661,42 @@ class OptimizedFishSpeechV2:
         
         # CRITICAL: Disable gradient checkpointing for inference
         # Gradient checkpointing is for training only - it makes inference 10-20x slower!
+        logger.info("🔍 Attempting to disable gradient checkpointing...")
         try:
+            # The llama_queue is a wrapper, need to access the actual model
+            model = None
             if hasattr(self.llama_queue, 'model'):
                 model = self.llama_queue.model
-                if hasattr(model, 'config') and hasattr(model.config, 'use_gradient_checkpointing'):
-                    if model.config.use_gradient_checkpointing:
-                        logger.warning("⚠️ Gradient checkpointing was enabled (training mode) - disabling for inference")
-                        model.config.use_gradient_checkpointing = False
-                        # Also disable on the model itself if it has the method
-                        if hasattr(model, 'gradient_checkpointing_disable'):
-                            model.gradient_checkpointing_disable()
-                            logger.info("✅ Gradient checkpointing disabled - expect 10-20x speedup!")
+                logger.debug(f"Found model via llama_queue.model: {type(model)}")
+            elif hasattr(self.llama_queue, '_model'):
+                model = self.llama_queue._model
+                logger.debug(f"Found model via llama_queue._model: {type(model)}")
+            
+            if model is not None:
+                # Check if gradient checkpointing is enabled
+                if hasattr(model, 'config'):
+                    logger.debug(f"Model config attributes: {dir(model.config)}")
+                    if hasattr(model.config, 'use_gradient_checkpointing'):
+                        if model.config.use_gradient_checkpointing:
+                            logger.warning("⚠️ Gradient checkpointing was enabled (training mode) - disabling for inference")
+                            model.config.use_gradient_checkpointing = False
+                            
+                            # Also disable on the model itself
+                            if hasattr(model, 'gradient_checkpointing_disable'):
+                                model.gradient_checkpointing_disable()
+                                logger.info("✅ Gradient checkpointing disabled via method - expect 10-20x speedup!")
+                            else:
+                                logger.info("✅ Gradient checkpointing disabled in config")
+                        else:
+                            logger.info("✅ Gradient checkpointing already disabled")
+                    else:
+                        logger.warning("⚠️ Model config has no use_gradient_checkpointing attribute")
+                else:
+                    logger.warning("⚠️ Model has no config attribute")
+            else:
+                logger.warning("⚠️ Could not find model in llama_queue")
         except Exception as e:
-            logger.warning(f"Could not disable gradient checkpointing: {e}")
+            logger.error(f"❌ Error disabling gradient checkpointing: {e}", exc_info=True)
         
         # Create inference engine
         self.inference_engine = TTSInferenceEngine(

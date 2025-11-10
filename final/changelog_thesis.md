@@ -26,14 +26,18 @@ TTS completed: 341975ms (5.7 minutes for 2.4s audio)
 
 **Solution:**
 ```python
-# After loading model, explicitly disable gradient checkpointing
+# Method 1: Modify model config file directly (REQUIRED)
+# File: checkpoints/openaudio-s1-mini/config.json
+{
+    "use_gradient_checkpointing": false  // Changed from true
+}
+
+# Method 2: Also disable programmatically after loading (backup)
 if hasattr(model.config, 'use_gradient_checkpointing'):
     if model.config.use_gradient_checkpointing:
-        logger.warning("⚠️ Gradient checkpointing was enabled (training mode) - disabling for inference")
+        logger.warning("⚠️ Gradient checkpointing enabled - disabling")
         model.config.use_gradient_checkpointing = False
-        if hasattr(model, 'gradient_checkpointing_disable'):
-            model.gradient_checkpointing_disable()
-            logger.info("✅ Gradient checkpointing disabled - expect 10-20x speedup!")
+        model.gradient_checkpointing_disable()
 ```
 
 **Expected Performance After Fix:**
