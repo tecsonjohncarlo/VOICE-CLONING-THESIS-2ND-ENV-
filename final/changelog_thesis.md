@@ -123,14 +123,21 @@ def get_health(self) -> Dict[str, Any]:
 
 ## [2.2.3] - 2025-11-10 - Complete Requirements and Dependencies
 
-### Updated - Comprehensive requirements.txt
-**Why:** Missing Fish Speech dependencies causing import errors (lightning, audiotools)
-**Logic:** Include all Fish Speech core dependencies from pyproject.toml
-**Benefits:** One-command installation, no missing dependencies
+### Updated - Comprehensive requirements.txt with protobuf conflict resolution
+**Why:** Missing Fish Speech dependencies + protobuf version conflict
+**Logic:** Pin compatible versions, remove streamlit from main requirements
+**Benefits:** Clean installation without dependency conflicts
 
-**Critical Missing Dependencies:**
-- `lightning>=2.1.0` - Required for UniversalOptimizer, causes fallback to CPU
-- `descript-audiotools` - Provides `audiotools` module required by Fish Speech DAC model, causes startup failure
+**Critical Issues Fixed:**
+1. **Missing Dependencies:**
+   - `lightning>=2.1.0` - Required for UniversalOptimizer
+   - `descript-audiotools==0.7.2` - Provides `audiotools` module for Fish Speech DAC
+
+2. **Protobuf Conflict:**
+   - `streamlit>=1.28.0` requires `protobuf>=3.20`
+   - `descript-audiotools==0.7.2` requires `protobuf<3.20`
+   - **Solution:** Remove streamlit from main requirements, use Gradio instead
+   - Users can install streamlit separately in a different environment if needed
 
 **Added Dependencies:**
 ```
