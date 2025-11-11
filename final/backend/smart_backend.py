@@ -271,16 +271,20 @@ class ConfigurationSelector:
         """Select best configuration for detected hardware"""
         
         # GPU-based configuration
-        # Use 3.5GB threshold to account for floating point precision and usable VRAM
-        # RTX 3050 (4GB), RTX 3060 (12GB), etc. should all qualify
+        # CRITICAL FIX: Increased threshold from 3.5GB to 6GB
+        # RTX 3050 4GB causes memory overflow (uses 5.97GB, swaps to RAM)
+        # 6GB+ GPUs (RTX 3060, RTX 4060, etc.) work reliably
+        # 4GB GPUs should use CPU mode with ONNX for better performance
         logger.debug(f"GPU check: has_gpu={self.profile.has_gpu}, gpu_memory_gb={self.profile.gpu_memory_gb:.2f}")
-        if self.profile.has_gpu and self.profile.gpu_memory_gb >= 3.5:
+        if self.profile.has_gpu and self.profile.gpu_memory_gb >= 6.0:
             logger.info(f"✅ GPU configuration selected (GPU: {self.profile.gpu_name}, {self.profile.gpu_memory_gb:.2f}GB VRAM)")
             return self._gpu_config()
         
         # Log why GPU wasn't selected
         if self.profile.has_gpu:
-            logger.warning(f"⚠️ GPU detected but insufficient VRAM: {self.profile.gpu_memory_gb:.2f}GB < 3.5GB required")
+            logger.warning(f"⚠️ GPU detected but insufficient VRAM: {self.profile.gpu_memory_gb:.2f}GB < 6.0GB required")
+            logger.warning(f"⚠️ 4GB GPUs cause memory overflow (5.97GB usage) - using CPU mode instead")
+            logger.info(f"💡 CPU mode with ONNX will provide better performance than overloaded GPU")
         else:
             logger.info("ℹ️ No GPU detected, using CPU configuration")
         
