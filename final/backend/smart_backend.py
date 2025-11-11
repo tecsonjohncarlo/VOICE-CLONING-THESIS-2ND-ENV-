@@ -837,7 +837,13 @@ class SmartAdaptiveBackend:
         self.detector = SmartHardwareDetector()
         self.profile = self.detector.profile
         
-        # Step 2: Select optimal configuration
+        # Step 2: Check for user device preference
+        user_device = os.getenv('DEVICE', 'auto').lower()
+        if user_device != 'auto':
+            logger.info(f"👤 User device preference: {user_device.upper()} (overriding auto-detection)")
+            self._apply_user_device_preference(user_device)
+        
+        # Step 3: Select optimal configuration
         self.selector = ConfigurationSelector(self.profile, self.detector.is_wsl)
         self.config = self.selector.select_optimal_config()
         self._log_selected_config()
@@ -882,6 +888,33 @@ class SmartAdaptiveBackend:
         logger.info(f"")
         logger.info(f"Notes: {c.notes}")
         logger.info("="*70)
+    
+    def _apply_user_device_preference(self, user_device: str):
+        """Override auto-detected device with user preference"""
+        if user_device == 'cpu':
+            logger.info("✅ Forcing CPU mode (user preference)")
+            self.profile.device_type = 'cpu'
+            self.profile.has_gpu = False
+        elif user_device == 'cuda':
+            if torch.cuda.is_available():
+                logger.info("✅ Forcing CUDA mode (user preference)")
+                self.profile.device_type = 'cuda'
+                self.profile.has_gpu = True
+            else:
+                logger.warning("⚠️ CUDA requested but not available - falling back to CPU")
+                self.profile.device_type = 'cpu'
+                self.profile.has_gpu = False
+        elif user_device == 'mps':
+            if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                logger.info("✅ Forcing MPS mode (user preference)")
+                self.profile.device_type = 'mps'
+                self.profile.has_gpu = True
+            else:
+                logger.warning("⚠️ MPS requested but not available - falling back to CPU")
+                self.profile.device_type = 'cpu'
+                self.profile.has_gpu = False
+        else:
+            logger.warning(f"⚠️ Unknown device '{user_device}' - using auto-detection")
     
     def _apply_configuration(self):
         """Apply environment configuration"""

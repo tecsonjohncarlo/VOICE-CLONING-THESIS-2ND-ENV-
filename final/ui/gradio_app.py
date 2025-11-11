@@ -45,7 +45,8 @@ def synthesize_speech(
     top_p,
     speed,
     seed,
-    optimize_for_memory
+    optimize_for_memory,
+    force_cpu
 ):
     """
     Call TTS API and return audio with metrics
@@ -62,7 +63,8 @@ def synthesize_speech(
             'temperature': temperature,
             'top_p': top_p,
             'speed': speed,
-            'optimize_for_memory': optimize_for_memory
+            'optimize_for_memory': optimize_for_memory,
+            'force_cpu': force_cpu
         }
         
         if prompt_text:
@@ -170,15 +172,35 @@ def format_emotion_guide():
     return guide
 
 
+def get_hardware_info():
+    """Get detailed hardware information for display"""
+    health = get_health()
+    if not health:
+        return "🔴 API not available. Please start the backend server.", None
+    
+    device = health['device']
+    sys_info = health['system_info']
+    
+    # Build hardware info string
+    if device == 'cuda':
+        gpu_name = sys_info.get('gpu_name', 'Unknown GPU')
+        gpu_mem = sys_info.get('gpu_memory_gb', 0)
+        compute_cap = sys_info.get('compute_capability', 'N/A')
+        device_info = f"🟢 **GPU Detected**: {gpu_name} ({gpu_mem:.1f}GB VRAM, Compute {compute_cap})"
+    elif device == 'mps':
+        device_info = f"🟢 **Apple Silicon GPU**: {sys_info.get('gpu_name', 'Apple M-series')}"
+    else:
+        cpu_info = sys_info.get('cpu_model', 'Unknown CPU')
+        device_info = f"🟡 **CPU Mode**: {cpu_info}"
+    
+    return device_info, health
+
+
 def create_ui():
     """Create Gradio interface"""
     
     # Check API health
-    health = get_health()
-    if health:
-        device_info = f"🟢 Connected | Device: {health['device']} | {health['system_info'].get('gpu_name', 'CPU')}"
-    else:
-        device_info = "🔴 API not available. Please start the backend server."
+    device_info, health = get_hardware_info()
     
     # Custom CSS for dark theme and styling
     custom_css = """
@@ -300,6 +322,12 @@ def create_ui():
                                 value=False,
                                 info="Reduce VRAM usage (slower)"
                             )
+                            
+                            force_cpu = gr.Checkbox(
+                                label="Force CPU Mode",
+                                value=False,
+                                info="Disable GPU acceleration (useful for debugging or power saving)"
+                            )
                         
                         synthesize_btn = gr.Button("🎵 Generate Speech", variant="primary", size="lg")
                     
@@ -323,7 +351,8 @@ def create_ui():
                         top_p,
                         speed,
                         seed,
-                        optimize_for_memory
+                        optimize_for_memory,
+                        force_cpu
                     ],
                     outputs=[audio_output, status_output, metrics_output]
                 )
@@ -354,33 +383,61 @@ def create_ui():
                     if not health:
                         return "❌ Unable to connect to API"
                     
+                    device = health['device']
+                    sys_info = health['system_info']
+                    
                     info = f"""
-                    ## System Information
+                    ## 🖥️ Hardware Information
                     
                     **Status**: {health['status']}
                     
-                    **Device**: {health['device']}
-                    
-                    **System Info**:
-                    - Precision: {health['system_info'].get('precision', 'N/A')}
-                    - Quantization: {health['system_info'].get('quantization', 'N/A')}
-                    - Torch Compile: {health['system_info'].get('compile_enabled', 'N/A')}
+                    **Active Device**: `{device.upper()}`
                     """
                     
-                    if health['device'] == 'cuda':
+                    # GPU Information
+                    if device == 'cuda':
                         info += f"""
-                    - GPU: {health['system_info'].get('gpu_name', 'N/A')}
-                    - GPU Memory: {health['system_info'].get('gpu_memory_gb', 0):.1f} GB
-                    - Compute Capability: {health['system_info'].get('compute_capability', 'N/A')}
-                    - Allocated Memory: {health.get('gpu_memory_allocated_mb', 0):.1f} MB
-                    - Reserved Memory: {health.get('gpu_memory_reserved_mb', 0):.1f} MB
+                    
+                    ### 🎮 NVIDIA GPU
+                    - **Model**: {sys_info.get('gpu_name', 'N/A')}
+                    - **Total VRAM**: {sys_info.get('gpu_memory_gb', 0):.1f} GB
+                    - **Compute Capability**: {sys_info.get('compute_capability', 'N/A')}
+                    - **Currently Allocated**: {health.get('gpu_memory_allocated_mb', 0):.1f} MB
+                    - **Reserved Memory**: {health.get('gpu_memory_reserved_mb', 0):.1f} MB
+                    - **CUDA Available**: ✅ Yes
+                        """
+                    elif device == 'mps':
+                        info += f"""
+                    
+                    ### 🍎 Apple Silicon GPU
+                    - **Model**: {sys_info.get('gpu_name', 'Apple M-series')}
+                    - **Unified Memory**: Shared with system RAM
+                    - **MPS Available**: ✅ Yes
+                        """
+                    else:
+                        info += f"""
+                    
+                    ### 💻 CPU Mode
+                    - **Processor**: {sys_info.get('cpu_model', 'Unknown')}
+                    - **Note**: GPU acceleration not available or disabled
                         """
                     
+                    # Configuration
                     info += f"""
                     
-                    **Cache Stats**:
-                    - VQ Cache Size: {health['cache_stats'].get('vq_cache_size', 0)}
-                    - Semantic Cache Size: {health['cache_stats'].get('semantic_cache_size', 0)}
+                    ### ⚙️ Configuration
+                    - **Precision**: {sys_info.get('precision', 'N/A')}
+                    - **Quantization**: {sys_info.get('quantization', 'none')}
+                    - **Torch Compile**: {'✅ Enabled' if sys_info.get('compile_enabled') else '❌ Disabled'}
+                    
+                    ### 💾 Cache Statistics
+                    - **VQ Cache Size**: {health['cache_stats'].get('vq_cache_size', 0)} items
+                    - **Semantic Cache Size**: {health['cache_stats'].get('semantic_cache_size', 0)} items
+                    
+                    ### 💡 Tips
+                    - Use "Force CPU Mode" in Advanced Settings to disable GPU
+                    - Enable "Optimize for Memory" for 4GB GPUs
+                    - Clear cache if experiencing memory issues
                     """
                     
                     return info

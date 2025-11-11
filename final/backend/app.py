@@ -170,17 +170,33 @@ async def text_to_speech(
     top_p: float = Form(0.7, description="Nucleus sampling parameter"),
     speed: float = Form(1.0, description="Speech speed"),
     seed: Optional[int] = Form(None, description="Random seed"),
-    optimize_for_memory: bool = Form(False, description="Memory optimization")
+    optimize_for_memory: bool = Form(False, description="Memory optimization"),
+    force_cpu: bool = Form(False, description="Force CPU mode (disable GPU)")
 ):
     """
     Generate speech from text with optional voice cloning
     
     NOW WITH: Automatic resource monitoring and adaptive optimization
+    ADDED: force_cpu parameter to disable GPU at runtime
     
     Returns audio/wav with metrics in response headers
     """
     if not engine:
         raise HTTPException(status_code=503, detail="Engine not initialized")
+    
+    # Handle force_cpu by temporarily switching device
+    original_device = None
+    if force_cpu and engine.engine.device != 'cpu':
+        import torch
+        original_device = engine.engine.device
+        print(f"[INFO] Force CPU requested - switching from {original_device} to CPU")
+        engine.engine.device = 'cpu'
+        # Move models to CPU
+        if hasattr(engine.engine, 'llama_queue') and hasattr(engine.engine.llama_queue, 'model'):
+            engine.engine.llama_queue.model = engine.engine.llama_queue.model.to('cpu')
+        if hasattr(engine.engine, 'decoder_model'):
+            engine.engine.decoder_model = engine.engine.decoder_model.to('cpu')
+        torch.cuda.empty_cache() if torch.cuda.is_available() else None
     
     if not text or not text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
@@ -311,6 +327,17 @@ async def text_to_speech(
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
     
     finally:
+        # Restore original device if force_cpu was used
+        if original_device:
+            import torch
+            print(f"[INFO] Restoring device from CPU to {original_device}")
+            engine.engine.device = original_device
+            # Move models back to original device
+            if hasattr(engine.engine, 'llama_queue') and hasattr(engine.engine.llama_queue, 'model'):
+                engine.engine.llama_queue.model = engine.engine.llama_queue.model.to(original_device)
+            if hasattr(engine.engine, 'decoder_model'):
+                engine.engine.decoder_model = engine.engine.decoder_model.to(original_device)
+        
         # Cleanup temp files
         if speaker_path and speaker_path.exists():
             try:

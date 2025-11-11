@@ -1,5 +1,331 @@
 # Changelog - Thesis Implementation
 
+## [2.4.1] - 2025-11-12 - Fixed: DEVICE Environment Variable Now Respected
+
+### Fixed - Smart backend was ignoring user's DEVICE preference
+**Why:** Backend always auto-detected device, ignoring .env DEVICE setting
+**Logic:** Check DEVICE env var before auto-detection, override if not 'auto'
+**Benefits:** Users can force CPU/GPU mode via .env without code changes
+
+**Problem:**
+The `SmartAdaptiveBackend` was **completely ignoring** the `DEVICE` environment variable:
+```bash
+# .env file
+DEVICE=cpu  # ❌ This was being ignored!
+```
+
+Backend would still use GPU if detected, even when user explicitly set `DEVICE=cpu`.
+
+**Root Cause:**
+```python
+# smart_backend.py - OLD CODE
+def __init__(self, model_path: str = "checkpoints/openaudio-s1-mini"):
+    # Step 1: Detect hardware
+    self.detector = SmartHardwareDetector()
+    self.profile = self.detector.profile
+    
+    # Step 2: Select optimal configuration
+    # ❌ Never checks os.getenv('DEVICE')!
+    self.selector = ConfigurationSelector(self.profile, self.detector.is_wsl)
+    self.config = self.selector.select_optimal_config()
+```
+
+**Solution:**
+```python
+# smart_backend.py - NEW CODE
+def __init__(self, model_path: str = "checkpoints/openaudio-s1-mini"):
+    # Step 1: Detect hardware
+    self.detector = SmartHardwareDetector()
+    self.profile = self.detector.profile
+    
+    # Step 2: Check for user device preference
+    user_device = os.getenv('DEVICE', 'auto').lower()
+    if user_device != 'auto':
+        logger.info(f"👤 User device preference: {user_device.upper()} (overriding auto-detection)")
+        self._apply_user_device_preference(user_device)
+    
+    # Step 3: Select optimal configuration
+    self.selector = ConfigurationSelector(self.profile, self.detector.is_wsl)
+    self.config = self.selector.select_optimal_config()
+
+def _apply_user_device_preference(self, user_device: str):
+    """Override auto-detected device with user preference"""
+    if user_device == 'cpu':
+        logger.info("✅ Forcing CPU mode (user preference)")
+        self.profile.device_type = 'cpu'
+        self.profile.has_gpu = False
+    elif user_device == 'cuda':
+        if torch.cuda.is_available():
+            logger.info("✅ Forcing CUDA mode (user preference)")
+            self.profile.device_type = 'cuda'
+            self.profile.has_gpu = True
+        else:
+            logger.warning("⚠️ CUDA requested but not available - falling back to CPU")
+            self.profile.device_type = 'cpu'
+            self.profile.has_gpu = False
+    elif user_device == 'mps':
+        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            logger.info("✅ Forcing MPS mode (user preference)")
+            self.profile.device_type = 'mps'
+            self.profile.has_gpu = True
+        else:
+            logger.warning("⚠️ MPS requested but not available - falling back to CPU")
+            self.profile.device_type = 'cpu'
+            self.profile.has_gpu = False
+```
+
+**Updated .env and .env.example:**
+```bash
+# Device Configuration
+# Options: auto, cuda, mps, cpu
+# - auto: Automatically detect best device (recommended)
+# - cuda: Force NVIDIA GPU (requires PyTorch with CUDA support)
+# - mps: Force Apple Silicon GPU (macOS M1/M2/M3/M4 only)
+# - cpu: Force CPU mode (works everywhere, slower than GPU)
+#
+# NOTE: Smart backend respects this setting!
+# - If you set DEVICE=cpu, GPU will be disabled even if detected
+# - If you set DEVICE=cuda but no GPU available, falls back to CPU
+# - You can also use "Force CPU Mode" checkbox in Gradio UI for temporary override
+DEVICE=auto
+```
+
+**How It Works Now:**
+
+1. **DEVICE=auto** (default)
+   - Auto-detects best available device
+   - Uses GPU if available, CPU otherwise
+
+2. **DEVICE=cpu**
+   - Forces CPU mode even if GPU detected
+   - Useful for power saving, debugging, or freeing GPU for other apps
+
+3. **DEVICE=cuda**
+   - Forces CUDA mode if available
+   - Falls back to CPU with warning if CUDA not available
+
+4. **DEVICE=mps**
+   - Forces Apple Silicon GPU if available
+   - Falls back to CPU with warning if MPS not available
+
+**Three Ways to Control Device:**
+
+1. **Permanent (Backend Startup)**: Set `DEVICE=cpu` in `.env`
+2. **Temporary (Per Request)**: Use "Force CPU Mode" checkbox in Gradio UI
+3. **Auto (Default)**: Set `DEVICE=auto` for smart detection
+
+**Expected Behavior:**
+```bash
+# Scenario 1: Force CPU permanently
+DEVICE=cpu
+# Backend logs: "✅ Forcing CPU mode (user preference)"
+# GPU is never used
+
+# Scenario 2: Force CUDA (with fallback)
+DEVICE=cuda
+# If GPU available: "✅ Forcing CUDA mode (user preference)"
+# If no GPU: "⚠️ CUDA requested but not available - falling back to CPU"
+
+# Scenario 3: Auto-detect (default)
+DEVICE=auto
+# Backend logs: "✅ NVIDIA GPU detected: RTX 3050 Laptop GPU"
+# Uses best available device
+```
+
+**Why This Matters:**
+- **User control**: Respects explicit device preference
+- **Flexibility**: Can disable GPU without changing code
+- **Debugging**: Easy to test CPU vs GPU performance
+- **Power saving**: Disable GPU to reduce laptop power consumption
+- **Multi-tasking**: Free GPU for gaming/rendering while using CPU for TTS
+
+---
+
+## [2.4.0] - 2025-11-12 - Enhanced CUDA Setup Guide & Flexible GPU Control
+
+### Added - Comprehensive CUDA installation guide for PyTorch
+**Why:** Users with NVIDIA GPUs often have CUDA drivers but wrong PyTorch version
+**Logic:** Detect CUDA version via nvidia-smi, install matching PyTorch build
+**Benefits:** Proper GPU acceleration setup, eliminates "CUDA Available: False" issues
+
+**Problem:**
+Many users have NVIDIA GPUs and see CUDA 12.x in `nvidia-smi`, but PyTorch shows:
+```python
+torch.cuda.is_available()  # Returns False
+```
+
+This happens because they installed CPU-only PyTorch or wrong CUDA version.
+
+**Solution - Updated README.md:**
+
+Added step-by-step guide with 3 installation options:
+
+**Option A: CUDA 12.x (RTX 30/40 series)**
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+```
+
+**Option B: CUDA 11.8 (Older GPUs)**
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+**Option C: CPU Only**
+```bash
+pip install torch torchvision torchaudio
+```
+
+**Verification Command:**
+```python
+python -c "import torch; print(f'CUDA Available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
+```
+
+**Why This Helps:**
+- **Clear instructions**: Users know exactly which PyTorch to install
+- **Version matching**: CUDA 12.x drivers work with cu121 PyTorch
+- **Verification**: Immediate feedback if installation worked
+- **Troubleshooting**: Uninstall/reinstall steps if wrong version
+
+---
+
+### Added - Flexible GPU control in Gradio interface
+**Why:** Users need ability to disable GPU without restarting backend
+**Logic:** Add "Force CPU Mode" checkbox that temporarily switches to CPU
+**Benefits:** Power saving, debugging, testing CPU performance, thermal management
+
+**Changes:**
+
+**1. Enhanced Hardware Detection Display**
+
+`ui/gradio_app.py` - New `get_hardware_info()` function:
+```python
+def get_hardware_info():
+    """Get detailed hardware information for display"""
+    health = get_health()
+    device = health['device']
+    
+    if device == 'cuda':
+        gpu_name = sys_info.get('gpu_name', 'Unknown GPU')
+        gpu_mem = sys_info.get('gpu_memory_gb', 0)
+        compute_cap = sys_info.get('compute_capability', 'N/A')
+        device_info = f"🟢 **GPU Detected**: {gpu_name} ({gpu_mem:.1f}GB VRAM, Compute {compute_cap})"
+    elif device == 'mps':
+        device_info = f"🟢 **Apple Silicon GPU**: {sys_info.get('gpu_name', 'Apple M-series')}"
+    else:
+        cpu_info = sys_info.get('cpu_model', 'Unknown CPU')
+        device_info = f"🟡 **CPU Mode**: {cpu_info}"
+```
+
+**Display Examples:**
+- NVIDIA: `🟢 GPU Detected: RTX 3050 Laptop GPU (4.0GB VRAM, Compute 8.6)`
+- Apple: `🟢 Apple Silicon GPU: Apple M1 Pro`
+- CPU: `🟡 CPU Mode: Intel Core i5-1235U`
+
+**2. Force CPU Mode Checkbox**
+
+Added to Advanced Settings:
+```python
+force_cpu = gr.Checkbox(
+    label="Force CPU Mode",
+    value=False,
+    info="Disable GPU acceleration (useful for debugging or power saving)"
+)
+```
+
+**3. Enhanced System Info Tab**
+
+Improved hardware information display:
+```markdown
+## 🖥️ Hardware Information
+
+### 🎮 NVIDIA GPU
+- **Model**: NVIDIA GeForce RTX 3050 Laptop GPU
+- **Total VRAM**: 4.0 GB
+- **Compute Capability**: 8.6
+- **Currently Allocated**: 1234.5 MB
+- **Reserved Memory**: 2048.0 MB
+- **CUDA Available**: ✅ Yes
+
+### ⚙️ Configuration
+- **Precision**: fp16
+- **Quantization**: none
+- **Torch Compile**: ❌ Disabled
+
+### 💡 Tips
+- Use "Force CPU Mode" in Advanced Settings to disable GPU
+- Enable "Optimize for Memory" for 4GB GPUs
+- Clear cache if experiencing memory issues
+```
+
+**4. Backend API Support**
+
+`backend/app.py` - Added `force_cpu` parameter:
+```python
+@app.post("/tts")
+async def text_to_speech(
+    ...
+    force_cpu: bool = Form(False, description="Force CPU mode (disable GPU)")
+):
+    # Handle force_cpu by temporarily switching device
+    original_device = None
+    if force_cpu and engine.engine.device != 'cpu':
+        original_device = engine.engine.device
+        engine.engine.device = 'cpu'
+        # Move models to CPU
+        engine.engine.llama_queue.model = engine.engine.llama_queue.model.to('cpu')
+        engine.engine.decoder_model = engine.engine.decoder_model.to('cpu')
+        torch.cuda.empty_cache()
+    
+    try:
+        # ... synthesis ...
+    finally:
+        # Restore original device
+        if original_device:
+            engine.engine.device = original_device
+            engine.engine.llama_queue.model = engine.engine.llama_queue.model.to(original_device)
+            engine.engine.decoder_model = engine.engine.decoder_model.to(original_device)
+```
+
+**Why This Works:**
+- **Temporary switch**: Models moved to CPU only for that request
+- **Automatic restore**: GPU re-enabled after synthesis completes
+- **No restart needed**: Toggle GPU on/off without restarting backend
+- **Clean implementation**: Uses try/finally to ensure restoration
+
+**Use Cases:**
+1. **Power Saving**: Disable GPU to reduce laptop power consumption
+2. **Debugging**: Test if issue is GPU-specific or general
+3. **Thermal Management**: Reduce heat on laptops during long sessions
+4. **Comparison**: Compare GPU vs CPU performance
+5. **Multi-tasking**: Free GPU for other applications temporarily
+
+**Expected Behavior:**
+- Check "Force CPU Mode" → Synthesis uses CPU (slower but no GPU usage)
+- Uncheck → Next synthesis uses GPU again (faster)
+- No backend restart required
+- GPU memory freed during CPU synthesis
+
+---
+
+### Device-Specific Optimizations
+
+**For NVIDIA GPU Users:**
+- Install correct PyTorch CUDA version (cu121 for CUDA 12.x)
+- Use GPU mode for 10-30x faster synthesis
+- Toggle to CPU mode when needed without restart
+
+**For Intel i5 Baseline:**
+- CPU-only PyTorch installation
+- Already optimized with ONNX Runtime
+- No GPU toggle needed (always CPU)
+
+**For AMD Ryzen Users:**
+- CPU-only PyTorch (AMD GPU not supported by PyTorch)
+- Similar performance to Intel i5
+- Mobile thermal management enabled
+
+---
+
 ## [2.3.0] - 2025-11-10 - CRITICAL: Fix Extreme Token Generation Slowdown (0.56 tok/sec → 5-15 tok/sec)
 
 ### Fixed - Multiple critical bottlenecks causing catastrophic performance degradation
