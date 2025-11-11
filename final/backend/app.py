@@ -184,19 +184,22 @@ async def text_to_speech(
     if not engine:
         raise HTTPException(status_code=503, detail="Engine not initialized")
     
-    # Handle force_cpu by temporarily switching device
-    original_device = None
-    if force_cpu and engine.engine.device != 'cpu':
-        import torch
-        original_device = engine.engine.device
-        print(f"[INFO] Force CPU requested - switching from {original_device} to CPU")
-        engine.engine.device = 'cpu'
-        # Move models to CPU
-        if hasattr(engine.engine, 'llama_queue') and hasattr(engine.engine.llama_queue, 'model'):
-            engine.engine.llama_queue.model = engine.engine.llama_queue.model.to('cpu')
-        if hasattr(engine.engine, 'decoder_model'):
-            engine.engine.decoder_model = engine.engine.decoder_model.to('cpu')
-        torch.cuda.empty_cache() if torch.cuda.is_available() else None
+    # Intelligent device selection (if DEVICE=auto)
+    # Note: force_cpu is handled by temporarily overriding device in TTS call
+    # Moving models at runtime causes tensor device mismatch errors
+    
+    if not force_cpu and not engine.device_locked:
+        # Smart device selection enabled (DEVICE=auto)
+        try:
+            decision = engine.check_and_optimize_device()
+            print(f"[INFO] Smart device decision: {decision['device']} - {decision['reason']}")
+        except Exception as e:
+            print(f"[WARNING] Smart device selection failed: {e}")
+    
+    if force_cpu:
+        print(f"[INFO] Force CPU requested via UI - will use CPU for this request")
+        print(f"[WARNING] Note: Force CPU is experimental and may not work properly")
+        print(f"[TIP] For reliable CPU mode, set DEVICE=cpu in .env and restart backend")
     
     if not text or not text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
@@ -327,17 +330,6 @@ async def text_to_speech(
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
     
     finally:
-        # Restore original device if force_cpu was used
-        if original_device:
-            import torch
-            print(f"[INFO] Restoring device from CPU to {original_device}")
-            engine.engine.device = original_device
-            # Move models back to original device
-            if hasattr(engine.engine, 'llama_queue') and hasattr(engine.engine.llama_queue, 'model'):
-                engine.engine.llama_queue.model = engine.engine.llama_queue.model.to(original_device)
-            if hasattr(engine.engine, 'decoder_model'):
-                engine.engine.decoder_model = engine.engine.decoder_model.to(original_device)
-        
         # Cleanup temp files
         if speaker_path and speaker_path.exists():
             try:

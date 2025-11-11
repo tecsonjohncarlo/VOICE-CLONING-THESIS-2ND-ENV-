@@ -324,9 +324,9 @@ def create_ui():
                             )
                             
                             force_cpu = gr.Checkbox(
-                                label="Force CPU Mode",
+                                label="⚠️ Force CPU Mode (Experimental)",
                                 value=False,
-                                info="Disable GPU acceleration (useful for debugging or power saving)"
+                                info="WARNING: May cause errors. For reliable CPU mode, set DEVICE=cpu in .env and restart backend."
                             )
                         
                         synthesize_btn = gr.Button("🎵 Generate Speech", variant="primary", size="lg")

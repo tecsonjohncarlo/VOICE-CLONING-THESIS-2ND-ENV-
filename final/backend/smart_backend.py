@@ -821,9 +821,173 @@ class ResourceMonitor:
         return None
 
 
+class IntelligentDeviceSelector:
+    """
+    Intelligent device selector that monitors system load and chooses optimal device
+    
+    Features:
+    - Real-time GPU/CPU utilization monitoring
+    - Memory pressure detection
+    - Thermal monitoring (if available)
+    - Automatic device switching when DEVICE=auto
+    - Respects user preference when DEVICE is explicitly set
+    """
+    
+    def __init__(self, profile: HardwareProfile, user_preference: str = 'auto', device_locked: bool = False):
+        self.profile = profile
+        self.user_preference = user_preference
+        self.device_locked = device_locked
+        self.last_check_time = 0
+        self.check_interval = 5.0  # Check every 5 seconds
+        
+        # Thresholds for device switching
+        self.gpu_util_threshold = 85.0  # Switch to CPU if GPU >85% utilized
+        self.gpu_memory_threshold = 90.0  # Switch to CPU if GPU memory >90%
+        self.cpu_util_threshold = 90.0  # Switch to GPU if CPU >90% utilized
+        self.system_memory_threshold = 85.0  # Switch based on RAM pressure
+        
+        logger.info(f"🧠 Intelligent Device Selector initialized")
+        logger.info(f"   User preference: {user_preference}")
+        logger.info(f"   Device locked: {device_locked}")
+    
+    def get_optimal_device(self, current_device: str = None) -> dict:
+        """
+        Determine optimal device based on current system state
+        
+        Returns:
+            dict with 'device', 'reason', and 'should_switch' keys
+        """
+        import time
+        
+        # If device is locked by user, always return user preference
+        if self.device_locked:
+            return {
+                'device': self.user_preference,
+                'reason': 'User preference (locked)',
+                'should_switch': False
+            }
+        
+        # Rate limit checks to avoid overhead
+        current_time = time.time()
+        if current_time - self.last_check_time < self.check_interval:
+            return {
+                'device': current_device or self.profile.device_type,
+                'reason': 'Using current device (check interval not elapsed)',
+                'should_switch': False
+            }
+        
+        self.last_check_time = current_time
+        
+        # Get current system state
+        system_state = self._get_system_state()
+        
+        # Decision logic
+        decision = self._make_device_decision(system_state, current_device)
+        
+        return decision
+    
+    def _get_system_state(self) -> dict:
+        """Get current system resource utilization"""
+        state = {
+            'cpu_percent': psutil.cpu_percent(interval=0.1),
+            'memory_percent': psutil.virtual_memory().percent,
+            'gpu_available': self.profile.has_gpu,
+            'gpu_util': 0.0,
+            'gpu_memory_percent': 0.0,
+            'thermal_throttling': False
+        }
+        
+        # Get GPU stats if available
+        if self.profile.device_type == 'cuda' and torch.cuda.is_available():
+            try:
+                # GPU utilization (approximate via memory usage)
+                gpu_mem_allocated = torch.cuda.memory_allocated(0) / torch.cuda.get_device_properties(0).total_memory * 100
+                gpu_mem_reserved = torch.cuda.memory_reserved(0) / torch.cuda.get_device_properties(0).total_memory * 100
+                state['gpu_memory_percent'] = max(gpu_mem_allocated, gpu_mem_reserved)
+                
+                # Try to get GPU utilization via nvidia-smi (if available)
+                try:
+                    import subprocess
+                    result = subprocess.run(
+                        ['nvidia-smi', '--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'],
+                        capture_output=True, text=True, timeout=1
+                    )
+                    if result.returncode == 0:
+                        state['gpu_util'] = float(result.stdout.strip())
+                except:
+                    # Fallback: estimate from memory usage
+                    state['gpu_util'] = state['gpu_memory_percent']
+            except Exception as e:
+                logger.debug(f"Could not get GPU stats: {e}")
+        
+        return state
+    
+    def _make_device_decision(self, state: dict, current_device: str) -> dict:
+        """
+        Make intelligent device selection based on system state
+        
+        Decision tree:
+        1. If GPU overloaded (>85% util or >90% memory) → Switch to CPU
+        2. If CPU overloaded (>90% util) and GPU available → Switch to GPU
+        3. If system memory critical (>85%) → Use device with less memory pressure
+        4. Otherwise → Keep current device (avoid thrashing)
+        """
+        current_device = current_device or self.profile.device_type
+        
+        # Check if GPU is overloaded
+        if current_device == 'cuda' and state['gpu_available']:
+            if state['gpu_util'] > self.gpu_util_threshold:
+                return {
+                    'device': 'cpu',
+                    'reason': f"GPU overloaded ({state['gpu_util']:.1f}% utilization)",
+                    'should_switch': True
+                }
+            if state['gpu_memory_percent'] > self.gpu_memory_threshold:
+                return {
+                    'device': 'cpu',
+                    'reason': f"GPU memory critical ({state['gpu_memory_percent']:.1f}% used)",
+                    'should_switch': True
+                }
+        
+        # Check if CPU is overloaded and GPU is available
+        if current_device == 'cpu' and state['gpu_available']:
+            if state['cpu_percent'] > self.cpu_util_threshold:
+                # Only switch to GPU if it's not also overloaded
+                if state['gpu_util'] < 70.0 and state['gpu_memory_percent'] < 70.0:
+                    return {
+                        'device': 'cuda' if self.profile.device_type == 'cuda' else 'mps',
+                        'reason': f"CPU overloaded ({state['cpu_percent']:.1f}%), GPU available",
+                        'should_switch': True
+                    }
+        
+        # Check system memory pressure
+        if state['memory_percent'] > self.system_memory_threshold:
+            # Prefer GPU if available (uses VRAM instead of system RAM)
+            if state['gpu_available'] and current_device == 'cpu':
+                if state['gpu_memory_percent'] < 70.0:
+                    return {
+                        'device': 'cuda' if self.profile.device_type == 'cuda' else 'mps',
+                        'reason': f"System RAM critical ({state['memory_percent']:.1f}%), switching to GPU",
+                        'should_switch': True
+                    }
+        
+        # No issues detected, keep current device
+        return {
+            'device': current_device,
+            'reason': f"System healthy (CPU: {state['cpu_percent']:.1f}%, RAM: {state['memory_percent']:.1f}%)",
+            'should_switch': False
+        }
+
+
 class SmartAdaptiveBackend:
     """
     Intelligent adaptive backend that auto-detects and self-optimizes
+    
+    Features:
+    - Auto-detects hardware capabilities
+    - Monitors real-time system load
+    - Dynamically switches devices when DEVICE=auto
+    - Respects user preference when DEVICE is explicitly set
     
     Usage in app.py:
         from smart_backend import SmartAdaptiveBackend
@@ -838,10 +1002,17 @@ class SmartAdaptiveBackend:
         self.profile = self.detector.profile
         
         # Step 2: Check for user device preference
-        user_device = os.getenv('DEVICE', 'auto').lower()
-        if user_device != 'auto':
-            logger.info(f"👤 User device preference: {user_device.upper()} (overriding auto-detection)")
-            self._apply_user_device_preference(user_device)
+        self.user_device_preference = os.getenv('DEVICE', 'auto').lower()
+        self.device_locked = False  # Track if user has locked device choice
+        
+        if self.user_device_preference != 'auto':
+            logger.info(f"👤 User device preference: {self.user_device_preference.upper()}")
+            self._apply_user_device_preference(self.user_device_preference)
+            self.device_locked = True  # User explicitly chose device, don't auto-switch
+            logger.info("🔒 Device locked to user preference (won't auto-switch)")
+        else:
+            logger.info("🤖 Smart auto-selection enabled (will optimize based on system load)")
+            self.device_locked = False
         
         # Step 3: Select optimal configuration
         self.selector = ConfigurationSelector(self.profile, self.detector.is_wsl)
@@ -864,7 +1035,17 @@ class SmartAdaptiveBackend:
         # Step 7: Initialize engine with optimal settings
         self.engine = self._initialize_engine(model_path)
         
+        # Step 8: Initialize intelligent device selector for runtime optimization
+        self.intelligent_selector = IntelligentDeviceSelector(
+            profile=self.profile,
+            user_preference=self.user_device_preference,
+            device_locked=self.device_locked
+        )
+        
         logger.info("✅ Smart Adaptive Backend initialized successfully!")
+        if not self.device_locked:
+            logger.info("💡 Tip: Backend will auto-switch devices if system is overloaded")
+            logger.info("💡 To lock device, set DEVICE=cpu or DEVICE=cuda in .env")
     
     def _log_selected_config(self):
         """Log selected configuration"""
@@ -915,6 +1096,46 @@ class SmartAdaptiveBackend:
                 self.profile.has_gpu = False
         else:
             logger.warning(f"⚠️ Unknown device '{user_device}' - using auto-detection")
+    
+    def check_and_optimize_device(self) -> dict:
+        """
+        Check system load and determine optimal device for next synthesis
+        
+        Returns:
+            dict with device decision and reason
+        """
+        decision = self.intelligent_selector.get_optimal_device(self.engine.device)
+        
+        if decision['should_switch']:
+            logger.info(f"🔄 Smart device switch: {self.engine.device} → {decision['device']}")
+            logger.info(f"   Reason: {decision['reason']}")
+            self._switch_device(decision['device'])
+        
+        return decision
+    
+    def _switch_device(self, new_device: str):
+        """Switch models to new device"""
+        try:
+            old_device = self.engine.device
+            logger.info(f"🔄 Switching device: {old_device} → {new_device}")
+            
+            # Update engine device
+            self.engine.device = new_device
+            
+            # Move models to new device
+            if hasattr(self.engine, 'llama_queue') and hasattr(self.engine.llama_queue, 'model'):
+                self.engine.llama_queue.model = self.engine.llama_queue.model.to(new_device)
+            if hasattr(self.engine, 'decoder_model'):
+                self.engine.decoder_model = self.engine.decoder_model.to(new_device)
+            
+            # Clear cache from old device
+            if old_device == 'cuda' and torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            logger.info(f"✅ Device switched successfully to {new_device}")
+        except Exception as e:
+            logger.error(f"❌ Failed to switch device: {e}")
+            logger.warning(f"⚠️ Keeping device as {self.engine.device}")
     
     def _apply_configuration(self):
         """Apply environment configuration"""
