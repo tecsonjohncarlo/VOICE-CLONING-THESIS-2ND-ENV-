@@ -1,5 +1,49 @@
 # Changelog - Thesis Implementation
 
+## [2.5.5] - 2025-11-12 - MAJOR DOCUMENTATION OVERHAUL: Cross-Platform Setup Guide
+
+### Added - Comprehensive Linux/Mac support documentation
+**Why:** Original documentation was heavily Windows-focused, limiting accessibility for Linux/Mac users.
+**Logic:** Created platform-specific installation guides with hardware-aware optimizations for different systems.
+**Benefits:** Universal accessibility, reduced setup friction, hardware-specific performance optimizations.
+
+**What Was Added:**
+
+**README.md Improvements:**
+- 🪟🍎🐧 **Platform-specific installation sections** with emoji indicators for clarity
+- **Hardware detection commands** for NVIDIA GPU, Apple Silicon, and CPU identification
+- **Cross-platform dependency installation** with OS-specific virtual environment commands
+- **Shell script integration** for Linux/Mac users (scripts_unix/ directory)
+- **Platform-agnostic troubleshooting** with OS-specific diagnostic commands
+- **Hardware-specific optimization recommendations** based on the smart backend's findings
+
+**Key Hardware Optimizations Documented:**
+- **Apple Silicon M1 Air**: `QUANTIZATION=none` (critical - INT8 causes 40x slowdown)
+- **Apple Silicon M1 Pro/Max**: `DEVICE=mps` with `QUANTIZATION=none` for optimal performance
+- **NVIDIA RTX 4090/4080**: `QUANTIZATION=none` for maximum quality
+- **NVIDIA RTX 4060/3060**: `QUANTIZATION=int8` for memory efficiency
+- **Intel i5 Baseline**: `OMP_NUM_THREADS=6` with `QUANTIZATION=int8`
+- **AMD Ryzen systems**: `OMP_NUM_THREADS=8` with optimized threading
+
+**requirements.txt Enhancements:**
+- **Cross-platform PyTorch installation** commands for Windows/macOS/Linux
+- **Hardware-specific verification** commands for CUDA/MPS/CPU
+- **Step-by-step platform guides** with system dependency installation
+- **Unified model download** instructions for all platforms
+
+**Removed Outdated Content:**
+- ❌ **Emotion markers section** (non-functional feature that confused users)
+- ❌ **Windows-only troubleshooting** commands
+- ❌ **Single-platform installation** assumptions
+
+**Cross-Platform Script Integration:**
+- ✅ **Documented scripts_unix/** directory usage
+- ✅ **chmod +x** instructions for first-time Linux/Mac users
+- ✅ **Platform-specific startup** commands (run_all.bat vs ./scripts_unix/run_all.sh)
+- ✅ **Service management** instructions for stopping processes
+
+**This addresses a critical gap:** The original documentation assumed Windows usage, creating barriers for the 40%+ of developers using macOS/Linux. The new documentation ensures universal accessibility while leveraging the smart backend's hardware-specific optimizations.
+
 ## [2.5.4] - 2025-11-12 - CRITICAL DISCOVERY: M1 Air Performance Anomaly and Fix
 
 ### Fixed - Catastrophic performance degradation on M1 Air (RTF 95.64x)

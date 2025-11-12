@@ -102,7 +102,7 @@ python -c "import torch; print(f'MPS available: {torch.backends.mps.is_available
 ```bash
 DEVICE=mps
 MIXED_PRECISION=fp16
-QUANTIZATION=int8
+QUANTIZATION=false # INT8 quantization is not supported on MPS
 ENABLE_TORCH_COMPILE=false  # Important: MPS is unstable with torch.compile
 ```
 

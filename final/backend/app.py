@@ -16,6 +16,10 @@ from typing import Optional, List, Any
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()  # This loads .env file before anything else
+
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware

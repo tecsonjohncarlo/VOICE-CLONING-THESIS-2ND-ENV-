@@ -435,13 +435,16 @@ class ConfigurationSelector:
         )
     
     def _m1_air_config(self) -> OptimalConfig:
-        """M1 Air configuration (throttling expected)"""
+        """M1 Air configuration with thermal management"""
+        # Respect user's torch.compile preference (default: False for stability)
+        user_torch_compile = os.getenv('ENABLE_TORCH_COMPILE', 'false').lower() == 'true'
+        
         return OptimalConfig(
             device='mps',
             precision='fp16',
             quantization='none',  # Disabled: INT8 on MPS causes CPU fallback
             use_onnx=False,
-            use_torch_compile=True,
+            use_torch_compile=user_torch_compile,  # Respect user preference
             use_gradient_checkpointing=False, # Disabled for inference
             chunk_length=1024,  # Larger chunks for better performance
             max_batch_size=1,
@@ -451,7 +454,7 @@ class ConfigurationSelector:
             expected_rtf=2.4, # Projected RTF after fix
             expected_memory_gb=2.5,
             optimization_strategy='m1_air_fp16_optimized',
-            notes='FP16 only for MPS backend; INT8 disabled.',
+            notes=f'FP16 only for MPS backend; INT8 disabled. torch.compile: {"enabled" if user_torch_compile else "disabled (user preference)"}.',
             max_text_length=600  # M1 Air - conservative due to thermal throttling
         )
     

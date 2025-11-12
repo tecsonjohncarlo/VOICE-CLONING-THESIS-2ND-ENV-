@@ -148,7 +148,7 @@ install_fish_speech.bat
 # Clone Fish Speech to final folder
 git clone https://github.com/fishaudio/fish-speech.git
 cd fish-speech
-pip install -e .
+uv pip install -e .
 cd ..
 ```
 

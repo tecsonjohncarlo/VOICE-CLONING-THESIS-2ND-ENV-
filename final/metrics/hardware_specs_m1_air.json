@@ -1,0 +1,14 @@
+{
+  "hardware_tier": "m1_air",
+  "device_type": "mps",
+  "cpu_model": "arm",
+  "cores_physical": 8,
+  "cores_logical": 8,
+  "memory_gb": 8.0,
+  "gpu_name": "Apple Silicon GPU",
+  "gpu_memory_gb": 4.8,
+  "system": "Darwin",
+  "machine": "arm64",
+  "thermal_capable": true,
+  "avx512_vnni": false
+}
