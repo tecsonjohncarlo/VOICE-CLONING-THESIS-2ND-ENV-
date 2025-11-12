@@ -29,21 +29,56 @@ warnings.filterwarnings('ignore')
 
 # Add fish-speech to path
 def _setup_fish_speech_path():
-    """Setup Fish Speech in Python path"""
+    """Setup Fish Speech in Python path - Windows and Unix compatible"""
+    # First try environment variable
     fish_speech_dir = os.getenv("FISH_SPEECH_DIR")
-    if not fish_speech_dir:
-        # Try parent directory
-        parent_fish = Path(__file__).parent.parent / "fish-speech"
-        if parent_fish.exists():
-            fish_speech_dir = str(parent_fish)
+    if fish_speech_dir:
+        fish_speech_path = Path(fish_speech_dir).resolve()
+        if fish_speech_path.exists():
+            sys.path.insert(0, str(fish_speech_path))
+            return str(fish_speech_path)
+        else:
+            print(f"⚠️ FISH_SPEECH_DIR set but path not found: {fish_speech_dir}")
     
-    if fish_speech_dir and Path(fish_speech_dir).exists():
-        sys.path.insert(0, str(fish_speech_dir))
+    # Try relative path from backend directory
+    backend_dir = Path(__file__).parent.resolve()
+    parent_fish = backend_dir.parent / "fish-speech"
+    
+    if parent_fish.exists():
+        fish_speech_dir = str(parent_fish.resolve())
+        sys.path.insert(0, fish_speech_dir)
         return fish_speech_dir
+    
+    # Try alternative locations on Windows
+    if platform.system() == 'Windows':
+        # Check in current working directory
+        cwd_fish = Path.cwd() / "fish-speech"
+        if cwd_fish.exists():
+            fish_speech_dir = str(cwd_fish.resolve())
+            sys.path.insert(0, fish_speech_dir)
+            return fish_speech_dir
+        
+        # Check parent of current directory
+        parent_cwd_fish = Path.cwd().parent / "fish-speech"
+        if parent_cwd_fish.exists():
+            fish_speech_dir = str(parent_cwd_fish.resolve())
+            sys.path.insert(0, fish_speech_dir)
+            return fish_speech_dir
+    
+    # If we get here, provide helpful error
+    possible_paths = [
+        str(backend_dir.parent / "fish-speech"),
+        str(Path.cwd() / "fish-speech"),
+        "Set FISH_SPEECH_DIR environment variable"
+    ]
     
     raise FileNotFoundError(
         "Fish Speech installation not found!\n"
-        "Please set FISH_SPEECH_DIR in .env or place fish-speech folder in final/"
+        f"Tried paths:\n" + "\n".join(f"  - {p}" for p in possible_paths) + "\n"
+        "Solutions:\n"
+        "  1. Set FISH_SPEECH_DIR in .env to absolute path to fish-speech folder\n"
+        "  2. Place fish-speech folder in: " + str(backend_dir.parent) + "\n"
+        "  3. On Windows, ensure paths use forward slashes or raw strings"
     )
 
 FISH_SPEECH_DIR = _setup_fish_speech_path()
