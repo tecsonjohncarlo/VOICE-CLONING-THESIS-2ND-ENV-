@@ -123,6 +123,26 @@ After applying fixes, M1 Air logs should show:
 ✅ macOS: Using 'spawn' method for multiprocessing
 ```
 
+**FINAL CRITICAL FIXES APPLIED:**
+
+1. **Fixed macOS optimizations import path** - Added parent directory to sys.path
+2. **Fixed device configuration override** - M1 Air and M1 Pro configs now respect `has_gpu=False`
+3. **Enhanced gradient checkpointing disable** - Multiple model access paths for comprehensive disabling
+
+**Verification Commands:**
+
+Test the emergency fixes:
+```bash
+# Run emergency test
+python3 test_emergency_fix.py
+
+# Check backend logs for these messages:
+# ✅ Forcing CPU mode (user preference)
+# 🔒 MPS backend disabled - using CPU only
+# ✅ macOS: Using 'spawn' method for multiprocessing
+# ✅ Gradient checkpointing DISABLED via model.config
+```
+
 This emergency fix ensures M1 Air users have a stable, working system for thesis data collection while the more complex MPS optimizations are refined.
 
 ## [2.6.0] - 2025-11-12 - CRITICAL FIXES: MacBook Air M1 Stability & Performance Improvements

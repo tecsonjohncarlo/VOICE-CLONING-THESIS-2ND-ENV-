@@ -25,10 +25,16 @@ load_dotenv()  # This loads .env file before anything else
 import sys
 if sys.platform == "darwin":  # macOS
     try:
+        # Add parent directory to path for macos_optimizations
+        import os
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+        
         from macos_optimizations import apply_all_optimizations
         apply_all_optimizations()
-    except ImportError:
-        print("⚠️  macOS optimizations not available")
+    except ImportError as e:
+        print(f"⚠️  macOS optimizations not available: {e}")
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse

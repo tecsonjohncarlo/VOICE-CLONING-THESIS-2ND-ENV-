@@ -416,8 +416,11 @@ class ConfigurationSelector:
     
     def _m1_pro_config(self) -> OptimalConfig:
         """M1 Pro/Max/Ultra configuration"""
+        # CRITICAL FIX: Respect user device preference
+        device = 'cpu' if not self.profile.has_gpu else 'mps'
+        
         return OptimalConfig(
-            device='mps',
+            device=device,
             precision='fp16',
             quantization='int8',
             use_onnx=False,
@@ -439,8 +442,11 @@ class ConfigurationSelector:
         # Respect user's torch.compile preference (default: False for stability)
         user_torch_compile = os.getenv('ENABLE_TORCH_COMPILE', 'false').lower() == 'true'
         
+        # CRITICAL FIX: Respect user device preference
+        device = 'cpu' if not self.profile.has_gpu else 'mps'
+        
         return OptimalConfig(
-            device='mps',
+            device=device,
             precision='fp16',
             quantization='none',  # Disabled: INT8 on MPS causes CPU fallback
             use_onnx=False,
