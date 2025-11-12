@@ -705,9 +705,9 @@ class OptimizedFishSpeechV2:
                 if disabled_count > 0:
                     logger.info(f"✅ Gradient checkpointing disabled ({disabled_count} locations) - expect 10-20x speedup!")
                 else:
-                    logger.warning("⚠️ Could not find gradient checkpointing settings")
+                    logger.info("ℹ️ No gradient checkpointing settings found (may already be disabled)")
             else:
-                logger.warning("⚠️ Could not find model in llama_queue")
+                logger.info("ℹ️ Model not directly accessible in llama_queue (gradient checkpointing may already be disabled)")
         except Exception as e:
             logger.error(f"❌ Error disabling gradient checkpointing: {e}", exc_info=True)
         

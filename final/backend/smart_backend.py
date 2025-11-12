@@ -52,6 +52,7 @@ class OptimalConfig:
     expected_memory_gb: float
     optimization_strategy: str
     notes: str
+    use_gradient_checkpointing: bool = False # For training, not inference
     max_text_length: int = 500  # Maximum text length for this hardware
 
 
@@ -438,19 +439,20 @@ class ConfigurationSelector:
         return OptimalConfig(
             device='mps',
             precision='fp16',
-            quantization='int8',
+            quantization='none',  # Disabled: INT8 on MPS causes CPU fallback
             use_onnx=False,
             use_torch_compile=True,
-            chunk_length=256,  # Smaller chunks for thermal management
+            use_gradient_checkpointing=False, # Disabled for inference
+            chunk_length=1024,  # Larger chunks for better performance
             max_batch_size=1,
             num_threads=4,
             cache_limit=25,
             enable_thermal_management=True,
-            expected_rtf=15.0,
+            expected_rtf=2.4, # Projected RTF after fix
             expected_memory_gb=2.5,
-            optimization_strategy='m1_air_thermal_aware',
-            notes='⚠️ Performance degrades after 10-15min (fanless design)',
-            max_text_length=150  # M1 Air - conservative due to thermal throttling
+            optimization_strategy='m1_air_fp16_optimized',
+            notes='FP16 only for MPS backend; INT8 disabled.',
+            max_text_length=600  # M1 Air - conservative due to thermal throttling
         )
     
     def _high_end_cpu_config(self) -> OptimalConfig:

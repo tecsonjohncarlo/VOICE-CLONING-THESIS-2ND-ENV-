@@ -243,7 +243,7 @@ def create_ui():
                     with gr.Column(scale=2):
                         text_input = gr.Textbox(
                             label="Text to Synthesize",
-                            placeholder="Enter text here... Use (emotion) markers for expressive speech!",
+                            placeholder="Enter text here...",
                             lines=5,
                             max_lines=10
                         )
@@ -357,19 +357,18 @@ def create_ui():
                     outputs=[audio_output, status_output, metrics_output]
                 )
             
-            # Emotion Guide Tab
-            with gr.Tab("🎭 Emotion Guide"):
-                gr.Markdown(format_emotion_guide())
-                
+            # Tips Tab
+            with gr.Tab("💡 Tips"):
                 gr.Markdown(
                     """
                     ### 💡 Tips for Best Results:
                     
-                    1. **Reference Audio**: Use 10-30 seconds of clear speech
-                    2. **Emotion Markers**: Place at the beginning or end of sentences
-                    3. **Multiple Emotions**: You can use multiple markers in one text
-                    4. **Language Support**: Emotions work best with English, Chinese, and Japanese
+                    1. **Reference Audio**: Use 10-30 seconds of clear speech for voice cloning
+                    2. **Reference Transcript**: Providing the transcript improves cloning quality
+                    3. **Text Length**: Keep text under 200 characters for 4GB GPUs, 600 for 6GB+
+                    4. **Language Support**: Auto-detects from text (English, Chinese, Japanese, etc.)
                     5. **Temperature**: Lower (0.5-0.7) for consistent speech, higher (0.8-1.2) for variety
+                    6. **Device Selection**: Set DEVICE in .env (auto/cpu/cuda) for best performance
                     """
                 )
             
