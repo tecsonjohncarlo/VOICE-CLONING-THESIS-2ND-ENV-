@@ -1,4 +1,4 @@
-There are like 10 different methods to detect them, to quantify them,
+ There are like 10 different methods to detect them, to quantify them,
  to decide what is an outlier, what isn't an outlier.
  And then you need to decide whether you keep them or remove them.
  And if you remove them, you need to argument why you remove them. 

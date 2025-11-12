@@ -452,9 +452,9 @@ class ConfigurationSelector:
             os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # Allow CPU fallback for unsupported ops
             os.environ["OMP_NUM_THREADS"] = "4"
             os.environ["MKL_NUM_THREADS"] = "4"
-            self.logger.info("✅ M1 Air: Environment variables configured for MPS stability")
-            self.logger.info("   PYTORCH_ENABLE_MPS_FALLBACK=1 (CPU fallback enabled)")
-            self.logger.info("   OMP_NUM_THREADS=4, MKL_NUM_THREADS=4")
+            logger.info("✅ M1 Air: Environment variables configured for MPS stability")
+            logger.info("   PYTORCH_ENABLE_MPS_FALLBACK=1 (CPU fallback enabled)")
+            logger.info("   OMP_NUM_THREADS=4, MKL_NUM_THREADS=4")
         
         return OptimalConfig(
             device=device,

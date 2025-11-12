@@ -1,6 +1,6 @@
 {
   "hardware_tier": "m1_air",
-  "device_type": "cpu",
+  "device_type": "mps",
   "cpu_model": "arm",
   "cores_physical": 8,
   "cores_logical": 8,
