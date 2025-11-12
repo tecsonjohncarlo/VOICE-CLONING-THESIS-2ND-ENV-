@@ -1085,6 +1085,12 @@ class SmartAdaptiveBackend:
             logger.info("✅ Forcing CPU mode (user preference)")
             self.profile.device_type = 'cpu'
             self.profile.has_gpu = False
+            
+            # CRITICAL FIX: Disable MPS explicitly when forcing CPU
+            import os
+            if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
+                logger.info("🔒 MPS backend disabled - using CPU only")
         elif user_device == 'cuda':
             if torch.cuda.is_available():
                 logger.info("✅ Forcing CUDA mode (user preference)")

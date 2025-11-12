@@ -15,10 +15,20 @@ from pathlib import Path
 from typing import Optional, List, Any
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
 load_dotenv()  # This loads .env file before anything else
+
+# Apply macOS-specific optimizations if running on macOS
+import sys
+if sys.platform == "darwin":  # macOS
+    try:
+        from macos_optimizations import apply_all_optimizations
+        apply_all_optimizations()
+    except ImportError:
+        print("⚠️  macOS optimizations not available")
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -34,84 +44,21 @@ import psutil  # For memory estimation
 from smart_backend import SmartAdaptiveBackend as OptimizedFishSpeech
 print("[INFO] Using SmartAdaptiveBackend (auto-optimizing)")
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Optimized Fish Speech TTS API with Smart Backend",
-    description="Self-optimizing TTS API that auto-detects hardware and adapts configuration",
-    version="2.0.0"
-)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Global engine instance
 engine: Optional[OptimizedFishSpeech] = None
 executor = ThreadPoolExecutor(max_workers=4)
-
-# Global performance monitor
 monitor: Optional[Any] = None
 
-
-# Pydantic models (unchanged)
-class TTSRequest(BaseModel):
-    """TTS request parameters"""
-    text: str = Field(..., description="Text to synthesize")
-    language: str = Field("en", description="Language code (auto-detected)")
-    temperature: float = Field(0.7, ge=0.1, le=2.0, description="Sampling temperature")
-    top_p: float = Field(0.7, ge=0.1, le=1.0, description="Nucleus sampling parameter")
-    speed: float = Field(1.0, ge=0.5, le=2.0, description="Speech speed (not implemented)")
-    seed: Optional[int] = Field(None, description="Random seed (not implemented)")
-    optimize_for_memory: bool = Field(False, description="Prioritize memory over speed")
-    prompt_text: Optional[str] = Field(None, description="Transcript of reference audio")
-
-
-class HealthResponse(BaseModel):
-    """Health check response with smart insights"""
-    status: str
-    device: str
-    system_info: dict
-    cache_stats: dict
-    smart_insights: Optional[List[str]] = None
-    current_resources: Optional[dict] = None
-    hardware_profile: Optional[dict] = None
-
-
-class MetricsResponse(BaseModel):
-    """Metrics response with resource monitoring"""
-    rolling_aggregates: dict
-    current_gpu_util: float
-    current_resources: Optional[dict] = None
-
-
-class VoiceInfo(BaseModel):
-    """Voice/speaker information"""
-    id: str
-    name: str
-    cached: bool
-
-
-@app.on_event("startup")
-async def startup_event():
-    """
-    Initialize smart adaptive engine on startup
-    
-    CHANGED: Removed device parameter - auto-detected by smart backend
-    """
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
     global engine, monitor
     
+    # Startup
     model_path = os.getenv("MODEL_DIR", "checkpoints/openaudio-s1-mini")
     
     try:
-        # ========================================
-        # CHANGED: Just pass model_path
-        # Smart backend auto-detects everything!
-        # ========================================
+        # Initialize Smart Adaptive Backend
         engine = OptimizedFishSpeech(model_path=model_path)
         
         print("[OK] Smart Adaptive Engine initialized")
@@ -128,16 +75,97 @@ async def startup_event():
     except Exception as e:
         print(f"[ERROR] Failed to initialize engine: {e}")
         raise
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    global engine
+    
+    yield  # Application runs here
+    
+    # Shutdown
+    print("[INFO] Shutting down gracefully...")
+    
+    # Cancel any running tasks
+    try:
+        # Get all running tasks
+        tasks = [task for task in asyncio.all_tasks() if not task.done()]
+        if tasks:
+            print(f"[INFO] Cancelling {len(tasks)} running tasks...")
+            for task in tasks:
+                if not task.cancelled():
+                    task.cancel()
+            
+            # Wait for tasks to complete with timeout
+            try:
+                await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5.0)
+            except asyncio.TimeoutError:
+                print("[WARNING] Some tasks did not complete within timeout")
+    except Exception as e:
+        print(f"[WARNING] Error during task cleanup: {e}")
+    
+    # Shutdown executor
+    try:
+        executor.shutdown(wait=True, cancel_futures=True)
+        print("[OK] Thread pool executor shutdown")
+    except Exception as e:
+        print(f"[WARNING] Error shutting down executor: {e}")
+    
+    # Cleanup engine
     if engine:
-        engine.cleanup()
-        print("[OK] Engine cleaned up")
+        try:
+            engine.cleanup()
+            print("[OK] Engine cleaned up")
+        except Exception as e:
+            print(f"[WARNING] Error during engine cleanup: {e}")
+    
+    print("[OK] Graceful shutdown complete")
 
+# Initialize FastAPI app with lifespan
+app = FastAPI(
+    title="Optimized Fish Speech TTS API with Smart Backend",
+    description="Self-optimizing TTS API that auto-detects hardware and adapts configuration",
+    version="2.1.0",
+    lifespan=lifespan
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Pydantic models (unchanged)
+class TTSRequest(BaseModel):
+    """TTS request parameters"""
+    text: str = Field(..., description="Text to synthesize")
+    language: str = Field("en", description="Language code (auto-detected)")
+    temperature: float = Field(0.7, ge=0.1, le=2.0, description="Sampling temperature")
+    top_p: float = Field(0.7, ge=0.1, le=1.0, description="Nucleus sampling parameter")
+    speed: float = Field(1.0, ge=0.5, le=2.0, description="Speech speed (not implemented)")
+    seed: Optional[int] = Field(None, description="Random seed (not implemented)")
+    optimize_for_memory: bool = Field(False, description="Prioritize memory over speed")
+    prompt_text: Optional[str] = Field(None, description="Transcript of reference audio")
+
+class HealthResponse(BaseModel):
+    """Health check response with smart insights"""
+    status: str
+    device: str
+    system_info: dict
+    cache_stats: dict
+    smart_insights: Optional[List[str]] = None
+    current_resources: Optional[dict] = None
+    hardware_profile: Optional[dict] = None
+
+class MetricsResponse(BaseModel):
+    """Metrics response with resource monitoring"""
+    rolling_aggregates: dict
+    current_gpu_util: float
+    current_resources: Optional[dict] = None
+
+class VoiceInfo(BaseModel):
+    """Voice/speaker information"""
+    id: str
+    name: str
+    cached: bool
 
 def run_tts_sync(text: str, 
                  speaker_file: Optional[Path],
@@ -252,18 +280,30 @@ async def text_to_speech(
         
         # Run TTS in thread pool (smart backend handles resource monitoring)
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            executor,
-            run_tts_sync,
-            text,
-            speaker_path,
-            prompt_text,
-            temperature,
-            top_p,
-            speed,
-            seed,
-            output_path
-        )
+        try:
+            result = await loop.run_in_executor(
+                executor,
+                run_tts_sync,
+                text,
+                speaker_path,
+                prompt_text,
+                temperature,
+                top_p,
+                speed,
+                seed,
+                output_path
+            )
+        except asyncio.CancelledError:
+            print(f"[INFO] TTS request {request_id} was cancelled")
+            # Cleanup monitoring if active
+            if monitor and 'monitor_task' in locals():
+                monitor.monitoring_active = False
+                try:
+                    await asyncio.wait_for(monitor_task, timeout=1.0)
+                except:
+                    pass
+                monitor.end_synthesis(success=False, error="Request cancelled")
+            raise HTTPException(status_code=499, detail="Request cancelled")
         
         metrics = result['metrics']
         

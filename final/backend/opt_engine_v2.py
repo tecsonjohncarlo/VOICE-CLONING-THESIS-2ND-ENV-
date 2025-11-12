@@ -600,6 +600,20 @@ class OptimizedFishSpeechV2:
         else:
             self.device = device
         
+        # CRITICAL FIX: macOS multiprocessing + MPS compatibility
+        if platform.system() == 'Darwin':  # macOS
+            try:
+                import torch.multiprocessing as mp
+                mp.set_start_method('spawn', force=True)
+                logger.info("✅ macOS: Using 'spawn' method for multiprocessing")
+                
+                # Disable DataLoader workers if using MPS
+                if self.device == "mps":
+                    os.environ["PYTORCH_MPS_NO_FORK"] = "1"
+                    logger.info("✅ MPS: Disabled fork() to prevent deadlock")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not configure macOS multiprocessing: {e}")
+        
         # Validate model
         self.codec_path = self.model_path / "codec.pth"
         if not self.model_path.exists():
@@ -659,18 +673,27 @@ class OptimizedFishSpeechV2:
             compile=ENABLE_TORCH_COMPILE,
         )
         
-        # CRITICAL: Disable gradient checkpointing for inference
+        # CRITICAL: Force disable gradient checkpointing for inference
         # Gradient checkpointing is for training only - it makes inference 10-20x slower!
-        logger.info("🔍 Attempting to disable gradient checkpointing...")
+        logger.info("🔍 Force disabling gradient checkpointing...")
         try:
-            # The llama_queue is a wrapper, need to access the actual model
+            # Try multiple access paths to find the actual model
             model = None
-            if hasattr(self.llama_queue, 'model'):
-                model = self.llama_queue.model
-                logger.debug(f"Found model via llama_queue.model: {type(model)}")
-            elif hasattr(self.llama_queue, '_model'):
-                model = self.llama_queue._model
-                logger.debug(f"Found model via llama_queue._model: {type(model)}")
+            access_paths = [
+                ('llama_queue.model', lambda: self.llama_queue.model if hasattr(self.llama_queue, 'model') else None),
+                ('llama_queue._model', lambda: self.llama_queue._model if hasattr(self.llama_queue, '_model') else None),
+                ('llama_queue.llama.model', lambda: self.llama_queue.llama.model if hasattr(self.llama_queue, 'llama') and hasattr(self.llama_queue.llama, 'model') else None),
+                ('llama_queue.llama', lambda: self.llama_queue.llama if hasattr(self.llama_queue, 'llama') else None)
+            ]
+            
+            for path_name, accessor in access_paths:
+                try:
+                    model = accessor()
+                    if model is not None:
+                        logger.debug(f"Found model via {path_name}: {type(model)}")
+                        break
+                except:
+                    continue
             
             if model is not None:
                 # AGGRESSIVE FIX: Force disable gradient checkpointing multiple ways
