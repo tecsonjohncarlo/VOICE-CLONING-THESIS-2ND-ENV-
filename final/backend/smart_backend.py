@@ -41,8 +41,8 @@ class OptimalConfig:
     device: str
     precision: str  # 'fp32', 'fp16', 'bf16'
     quantization: str  # 'none', 'int8', 'int4'
-    use_onnx: bool
-    use_torch_compile: bool
+    useonnx: bool
+    usetorchcompile: bool
     chunk_length: int
     max_batch_size: int
     num_threads: int
@@ -314,8 +314,8 @@ class ConfigurationSelector:
                 device='cuda',
                 precision='fp16',  # Force fp16, not bf16
                 quantization='none',  # Disable INT8 - not reducing memory effectively
-                use_onnx=False,
-                use_torch_compile=False,  # Disabled on Windows
+                useonnx=False,
+                usetorchcompile=False,  # Disabled on Windows
                 chunk_length=200,  # CRITICAL: Reduced from 1024 to 200
                 max_batch_size=1,  # Force batch size 1
                 num_threads=4,
@@ -396,8 +396,8 @@ class ConfigurationSelector:
             device='cuda' if self.profile.device_type == 'cuda' else 'mps',
             precision=precision,
             quantization=quantization,
-            use_onnx=False,  # Not needed for GPU
-            use_torch_compile=use_compile,
+            useonnx=False,  # Not needed for GPU
+            usetorchcompile=use_compile,
             chunk_length=1024,  # Large chunks for GPU
             max_batch_size=4,
             num_threads=self.profile.cores_physical // 2,
@@ -423,8 +423,8 @@ class ConfigurationSelector:
             device=device,
             precision='fp16',
             quantization='int8',
-            use_onnx=False,
-            use_torch_compile=True,  # Works well on M1
+            useonnx=False,
+            usetorchcompile=False,  # Works well on M1
             chunk_length=512,
             max_batch_size=2,
             num_threads=4,
@@ -445,13 +445,23 @@ class ConfigurationSelector:
         # CRITICAL FIX: Respect user device preference
         device = 'cpu' if not self.profile.has_gpu else 'mps'
         
+        # ============================================
+        # CRITICAL: Set macOS-specific environment variables for MPS stability
+        # ============================================
+        if device == 'mps':
+            os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"  # Allow CPU fallback for unsupported ops
+            os.environ["OMP_NUM_THREADS"] = "4"
+            os.environ["MKL_NUM_THREADS"] = "4"
+            self.logger.info("✅ M1 Air: Environment variables configured for MPS stability")
+            self.logger.info("   PYTORCH_ENABLE_MPS_FALLBACK=1 (CPU fallback enabled)")
+            self.logger.info("   OMP_NUM_THREADS=4, MKL_NUM_THREADS=4")
+        
         return OptimalConfig(
             device=device,
             precision='fp16',
             quantization='none',  # Disabled: INT8 on MPS causes CPU fallback
-            use_onnx=False,
-            use_torch_compile=user_torch_compile,  # Respect user preference
-            use_gradient_checkpointing=False, # Disabled for inference
+            useonnx=False,
+            usetorchcompile=user_torch_compile,  # Respect user preference
             chunk_length=1024,  # Larger chunks for better performance
             max_batch_size=1,
             num_threads=4,
@@ -460,7 +470,8 @@ class ConfigurationSelector:
             expected_rtf=2.4, # Projected RTF after fix
             expected_memory_gb=2.5,
             optimization_strategy='m1_air_fp16_optimized',
-            notes=f'FP16 only for MPS backend; INT8 disabled. torch.compile: {"enabled" if user_torch_compile else "disabled (user preference)"}.',
+            notes=f'FP16 only for MPS backend; INT8 disabled. torch.compile: {"enabled" if user_torch_compile else "disabled (macOS limitation)"}.',
+            use_gradient_checkpointing=False, # Disabled for inference
             max_text_length=600  # M1 Air - conservative due to thermal throttling
         )
     
@@ -470,8 +481,8 @@ class ConfigurationSelector:
             device='cpu',
             precision='fp32',
             quantization='int8',
-            use_onnx=True,  # ✅ 4-5x speedup on CPU
-            use_torch_compile=True,
+            useonnx=True,  # ✅ 4-5x speedup on CPU
+            usetorchcompile=True,
             chunk_length=512,
             max_batch_size=2,
             num_threads=self.profile.cores_physical,
@@ -490,8 +501,8 @@ class ConfigurationSelector:
             device='cpu',
             precision='fp32',
             quantization='int8',
-            use_onnx=True,  # ✅ Critical for i5
-            use_torch_compile=False,  # Not helpful for single-use
+            useonnx=True,  # ✅ Critical for i5
+            usetorchcompile=False,  # Not helpful for single-use
             chunk_length=512,
             max_batch_size=1,
             num_threads=10,  # i5-1334U/1235U has 10 cores
@@ -510,8 +521,8 @@ class ConfigurationSelector:
             device='cpu',
             precision='fp32',
             quantization='int8',
-            use_onnx=True,
-            use_torch_compile=False,
+            useonnx=True,
+            usetorchcompile=False,
             chunk_length=256,
             max_batch_size=1,
             num_threads=self.profile.cores_physical,
@@ -530,8 +541,8 @@ class ConfigurationSelector:
             device='cpu',
             precision='fp32',
             quantization='int8',
-            use_onnx=True,
-            use_torch_compile=False,
+            useonnx=True,
+            usetorchcompile=False,
             chunk_length=256,
             max_batch_size=1,
             num_threads=min(4, self.profile.cores_physical),
@@ -550,8 +561,8 @@ class ConfigurationSelector:
             device='cpu',
             precision='fp32',
             quantization='int4',  # Aggressive
-            use_onnx=True,
-            use_torch_compile=False,
+            useonnx=True,
+            usetorchcompile=False,
             chunk_length=128,
             max_batch_size=1,
             num_threads=self.profile.cores_physical,
@@ -820,8 +831,8 @@ class ResourceMonitor:
                 device=current_config.device,
                 precision=current_config.precision,
                 quantization=current_config.quantization,
-                use_onnx=current_config.use_onnx,
-                use_torch_compile=current_config.use_torch_compile,
+                useonnx=current_config.useonnx,
+                usetorchcompile=current_config.usetorchcompile,
                 chunk_length=current_config.chunk_length // 2,  # Smaller chunks
                 max_batch_size=1,  # Force batch size 1
                 num_threads=max(1, current_config.num_threads // 2),  # Reduce threads
@@ -1072,8 +1083,8 @@ class SmartAdaptiveBackend:
         logger.info(f"Device: {c.device}")
         logger.info(f"Precision: {c.precision}")
         logger.info(f"Quantization: {c.quantization}")
-        logger.info(f"ONNX Runtime: {'✅ Enabled' if c.use_onnx else '❌ Disabled'}")
-        logger.info(f"torch.compile: {'✅ Enabled' if c.use_torch_compile else '❌ Disabled'}")
+        logger.info(f"ONNX Runtime: {'✅ Enabled' if c.useonnx else '❌ Disabled'}")
+        logger.info(f"torch.compile: {'✅ Enabled' if c.usetorchcompile else '❌ Disabled'}")
         logger.info(f"Chunk Length: {c.chunk_length}")
         logger.info(f"Threads: {c.num_threads}")
         logger.info(f"Max Text Length: {c.max_text_length} characters")
@@ -1163,7 +1174,7 @@ class SmartAdaptiveBackend:
         # Set environment variables
         os.environ['DEVICE'] = self.config.device
         os.environ['MIXED_PRECISION'] = self.config.precision
-        os.environ['ENABLE_TORCH_COMPILE'] = 'true' if self.config.use_torch_compile else 'false'
+        os.environ['ENABLE_TORCH_COMPILE'] = 'true' if self.config.usetorchcompile else 'false'
         os.environ['OMP_NUM_THREADS'] = str(self.config.num_threads)
         os.environ['MKL_NUM_THREADS'] = str(self.config.num_threads)
         
@@ -1183,7 +1194,7 @@ class SmartAdaptiveBackend:
         """Initialize appropriate engine based on configuration"""
         
         # Use ONNX-optimized engine for CPU
-        if self.config.use_onnx and self.config.device == 'cpu':
+        if self.config.useonnx and self.config.device == 'cpu':
             try:
                 from universal_optimizer import UniversalFishSpeechOptimizer
                 logger.info("📦 Loading Universal Optimizer with ONNX Runtime")
@@ -1313,7 +1324,7 @@ class SmartAdaptiveBackend:
             insights.append("⚠️ Memory usage high - consider reducing batch size")
         if self.profile.cpu_tier == 'm1_air' and not self.profile.thermal_capable:
             insights.append("⚠️ M1 Air: Performance may degrade after 10-15 minutes")
-        if not self.config.use_onnx and self.config.device == 'cpu':
+        if not self.config.useonnx and self.config.device == 'cpu':
             insights.append("💡 ONNX Runtime could provide 4-5x speedup for CPU inference")
         
         base_health['smart_insights'] = insights

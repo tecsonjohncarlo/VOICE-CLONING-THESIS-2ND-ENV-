@@ -212,8 +212,8 @@ class PerformanceMonitor:
             reference_audio_seconds=ref_audio_s,
             start_time=time.time(),
             quantization_used=config.quantization,
-            torch_compile_used=config.use_torch_compile,
-            onnx_used=config.use_onnx,
+            torch_compile_used=config.usetorchcompile,
+            onnx_used=config.useonnx,
             chunk_length=config.chunk_length,
             num_threads=config.num_threads,
         )

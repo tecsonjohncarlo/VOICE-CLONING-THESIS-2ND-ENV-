@@ -673,66 +673,64 @@ class OptimizedFishSpeechV2:
             compile=ENABLE_TORCH_COMPILE,
         )
         
-        # CRITICAL: Force disable gradient checkpointing for inference
-        # Gradient checkpointing is for training only - it makes inference 10-20x slower!
+        # ============================================
+        # CRITICAL FIX: Force disable gradient checkpointing
+        # Model checkpoint has use_gradient_checkpointing=True
+        # Must override it AFTER loading
+        # ============================================
         logger.info("🔍 Force disabling gradient checkpointing...")
-        try:
-            # Try multiple access paths to find the actual model
-            model = None
-            access_paths = [
-                ('llama_queue.model', lambda: self.llama_queue.model if hasattr(self.llama_queue, 'model') else None),
-                ('llama_queue._model', lambda: self.llama_queue._model if hasattr(self.llama_queue, '_model') else None),
-                ('llama_queue.llama.model', lambda: self.llama_queue.llama.model if hasattr(self.llama_queue, 'llama') and hasattr(self.llama_queue.llama, 'model') else None),
-                ('llama_queue.llama', lambda: self.llama_queue.llama if hasattr(self.llama_queue, 'llama') else None)
-            ]
-            
-            for path_name, accessor in access_paths:
-                try:
-                    model = accessor()
-                    if model is not None:
-                        logger.debug(f"Found model via {path_name}: {type(model)}")
+        
+        # Try multiple access paths to find the model
+        # Note: llama_queue is in a separate thread, so model may not be directly accessible
+        model = None
+        access_paths = [
+            ('llama_queue.model', lambda: self.llama_queue.model if hasattr(self.llama_queue, 'model') else None),
+            ('llama_queue.llama.model', lambda: self.llama_queue.llama.model if hasattr(self.llama_queue, 'llama') and hasattr(self.llama_queue.llama, 'model') else None),
+            ('llama_queue.model_runner', lambda: self.llama_queue.model_runner if hasattr(self.llama_queue, 'model_runner') else None),
+        ]
+        
+        for path_name, accessor in access_paths:
+            try:
+                accessed_obj = accessor()
+                if accessed_obj is not None:
+                    # Check if it's the model itself or a container
+                    if hasattr(accessed_obj, 'config') or hasattr(accessed_obj, 'gradient_checkpointing_disable'):
+                        model = accessed_obj
+                        logger.info(f"✅ Model found via {path_name}")
                         break
-                except:
-                    continue
+                    # Check if it has a model attribute
+                    elif hasattr(accessed_obj, 'model'):
+                        model = accessed_obj.model
+                        logger.info(f"✅ Model found via {path_name}.model")
+                        break
+            except Exception as e:
+                logger.debug(f"Could not access model via {path_name}: {e}")
+        
+        if model is not None:
+            disabled_count = 0
             
-            if model is not None:
-                # AGGRESSIVE FIX: Force disable gradient checkpointing multiple ways
-                disabled_count = 0
-                
-                # Method 1: Disable via config
-                if hasattr(model, 'config'):
-                    logger.debug(f"Model config attributes: {dir(model.config)}")
-                    if hasattr(model.config, 'use_gradient_checkpointing'):
-                        model.config.use_gradient_checkpointing = False
-                        disabled_count += 1
-                        logger.info("✅ Gradient checkpointing disabled in config")
-                
-                # Method 2: Disable via model method
-                if hasattr(model, 'gradient_checkpointing_disable'):
+            # Method 1: Disable via config
+            if hasattr(model, 'config') and hasattr(model.config, 'use_gradient_checkpointing'):
+                model.config.use_gradient_checkpointing = False
+                logger.info("✅ Gradient checkpointing DISABLED via model.config")
+                disabled_count += 1
+            
+            # Method 2: Disable via method
+            if hasattr(model, 'gradient_checkpointing_disable'):
+                try:
                     model.gradient_checkpointing_disable()
+                    logger.info("✅ Gradient checkpointing DISABLED via method")
                     disabled_count += 1
-                    logger.info("✅ Gradient checkpointing disabled via method")
-                
-                # Method 3: Force set use_gradient_checkpointing attribute
-                if hasattr(model, 'use_gradient_checkpointing'):
-                    model.use_gradient_checkpointing = False
-                    disabled_count += 1
-                    logger.info("✅ Gradient checkpointing disabled via attribute")
-                
-                # Method 4: Disable in all submodules
-                for name, module in model.named_modules():
-                    if hasattr(module, 'gradient_checkpointing'):
-                        module.gradient_checkpointing = False
-                        disabled_count += 1
-                
-                if disabled_count > 0:
-                    logger.info(f"✅ Gradient checkpointing disabled ({disabled_count} locations) - expect 10-20x speedup!")
-                else:
-                    logger.info("ℹ️ No gradient checkpointing settings found (may already be disabled)")
+                except Exception as e:
+                    logger.debug(f"Could not call gradient_checkpointing_disable(): {e}")
+            
+            if disabled_count > 0:
+                logger.info(f"🎯 Successfully disabled gradient checkpointing ({disabled_count} method(s))")
             else:
-                logger.info("ℹ️ Model not directly accessible in llama_queue (gradient checkpointing may already be disabled)")
-        except Exception as e:
-            logger.error(f"❌ Error disabling gradient checkpointing: {e}", exc_info=True)
+                logger.warning("⚠️ Could not disable gradient checkpointing - may cause 30-40% slowdown")
+        else:
+            logger.warning("ℹ️ Could not directly access model object (running in thread) - gradient checkpointing may still be enabled")
+            logger.info("⚠️ If synthesis is slow, check that use_gradient_checkpointing=False in checkpoint config")
         
         # Create inference engine
         self.inference_engine = TTSInferenceEngine(
