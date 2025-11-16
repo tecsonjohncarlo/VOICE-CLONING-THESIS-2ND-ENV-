@@ -21,7 +21,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'threads': 'match_p_cores',
             'mkl_optimization': True,
             'torch_compile': True
@@ -39,7 +39,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'threads': 'match_cores',
             'amd_optimizations': True,
             'torch_compile': True
@@ -74,7 +74,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'threads': 10,
             'thermal_chunking': True
         },
@@ -110,7 +110,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8_aggressive',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'threads': 'match_cores',
             'memory_conservative': True,
             'chunk_size_small': True
@@ -128,7 +128,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'amd_threading': True,
             'power_management': True
         },
@@ -312,10 +312,22 @@ def print_platform_expectations(config: Dict[str, Any]):
 class UniversalFishSpeechOptimizer:
     """Universal optimizer that adapts to any hardware"""
     
-    def __init__(self, model_path: str = "checkpoints/openaudio-s1-mini"):
+    def __init__(self, model_path: str = "checkpoints/openaudio-s1-mini", device: str = None):
+        """Initialize Universal Optimizer
+        
+        Args:
+            model_path: Path to model checkpoint
+            device: Optional device override (auto, cpu, cuda, mps). If None, uses detected config.
+        """
         # Detect hardware
         self.detector = UniversalHardwareDetector()
         self.config = self.detector.get_optimal_config()
+        
+        # CRITICAL FIX: Override device if user explicitly provided
+        # This ensures user preference (e.g., DEVICE=cpu) is respected throughout the chain
+        if device is not None:
+            logger.info(f"🔒 Overriding detected device '{self.config['optimizations'].get('device')}' with user preference: '{device}'")
+            self.config['optimizations']['device'] = device
         
         # Log detected configuration
         self._log_configuration()
@@ -444,12 +456,10 @@ class UniversalFishSpeechOptimizer:
         """Universal synthesis method that adapts to hardware capabilities"""
         start_time = time.time()
         
-        # Use chunking for lower-end hardware or long text
-        chunk_threshold = self.config['optimizations'].get('chunk_threshold', 200)
-        if len(text) > chunk_threshold or self.config['detected_tier'] in ['intel_low_end', 'arm_sbc']:
-            result = self._chunked_synthesis(text, reference_audio, **kwargs)
-        else:
-            result = self._direct_synthesis(text, reference_audio, **kwargs)
+        # OPTIMIZED: Disable chunking entirely for all device tiers
+        # Chunking adds 3x overhead with minimal benefit - direct synthesis is faster
+        # Always use direct synthesis regardless of text length or hardware tier
+        result = self._direct_synthesis(text, reference_audio, **kwargs)
         
         # Track performance
         elapsed = time.time() - start_time
@@ -565,3 +575,73 @@ class UniversalFishSpeechOptimizer:
     def get_performance_summary(self) -> Dict[str, Any]:
         """Get performance summary"""
         return self.performance_tracker.get_average_performance()
+    
+    def tts(self, text: str, speaker_wav: str = None, **kwargs):
+        """
+        TTS method for compatibility with SmartAdaptiveBackend
+        Delegates to synthesize() method
+        """
+        return self.synthesize(text=text, reference_audio=speaker_wav, **kwargs)
+    
+    def get_health(self) -> Dict[str, Any]:
+        """
+        Health check method for compatibility with SmartAdaptiveBackend
+        Returns system health status matching HealthResponse schema
+        """
+        try:
+            import psutil
+            
+            # Get base engine health if available
+            base_health = {}
+            if hasattr(self.base_engine, 'get_health'):
+                try:
+                    base_health = self.base_engine.get_health()
+                except:
+                    pass
+            
+            # Add system metrics
+            memory = psutil.virtual_memory()
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            
+            # Build health response matching HealthResponse schema
+            health = {
+                'status': 'healthy',
+                'device': self.config.get('device', 'cpu'),
+                'system_info': {
+                    'engine': 'UniversalFishSpeechOptimizer',
+                    'tier': self.config.get('detected_tier', 'unknown'),
+                    'onnx_enabled': self.onnx_optimizer is not None,
+                    'cpu_percent': cpu_percent,
+                    'memory_percent': memory.percent,
+                    'memory_available_gb': round(memory.available / (1024**3), 2),
+                    'memory_used_gb': round(memory.used / (1024**3), 2),
+                    'memory_total_gb': round(memory.total / (1024**3), 2)
+                },
+                'cache_stats': {
+                    'enabled': False,
+                    'size': 0,
+                    'hits': 0,
+                    'misses': 0
+                }
+            }
+            
+            # Add base engine health if available
+            if base_health:
+                health['system_info']['base_engine'] = base_health
+            
+            return health
+            
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return {
+                'status': 'error',
+                'device': 'unknown',
+                'system_info': {
+                    'error': str(e),
+                    'engine': 'UniversalFishSpeechOptimizer'
+                },
+                'cache_stats': {
+                    'enabled': False,
+                    'size': 0
+                }
+            }

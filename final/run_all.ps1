@@ -2,6 +2,12 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Fish Speech TTS - Complete Startup" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
+# Change to script directory
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $scriptDir
+Write-Host "Working directory: $scriptDir" -ForegroundColor Gray
+Write-Host ""
+
 # Kill existing processes on ports 7860 and 8000
 Write-Host "Checking for existing processes..." -ForegroundColor Yellow
 
@@ -41,20 +47,45 @@ if ($pidsToKill.Count -gt 0) {
 
 Write-Host ""
 
-# Deactivate conda
-conda deactivate 2>$null
+# Deactivate conda (if active)
+try {
+    conda deactivate 2>$null
+} catch {
+    # Conda not active or not installed
+}
 
 # Find virtual environment
 $venvPath = $null
 if (Test-Path "venv312\Scripts\Activate.ps1") {
     $venvPath = "venv312"
-    Write-Host "Using venv312 (Python 3.12)" -ForegroundColor Green
+    Write-Host "✅ Found venv312 (Python 3.12)" -ForegroundColor Green
 } elseif (Test-Path "venv\Scripts\Activate.ps1") {
     $venvPath = "venv"
-    Write-Host "Using venv" -ForegroundColor Yellow
+    Write-Host "✅ Found venv" -ForegroundColor Yellow
 } else {
-    Write-Host "ERROR: No virtual environment found!" -ForegroundColor Red
+    Write-Host "❌ ERROR: No virtual environment found!" -ForegroundColor Red
     Write-Host "Please run: uv venv --python 3.12 venv312" -ForegroundColor Yellow
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
+# Verify required files exist
+Write-Host "`nVerifying files..." -ForegroundColor Gray
+$requiredFiles = @("backend\app.py", "ui\gradio_app.py")
+$missingFiles = @()
+
+foreach ($file in $requiredFiles) {
+    if (-not (Test-Path $file)) {
+        $missingFiles += $file
+        Write-Host "  ❌ Missing: $file" -ForegroundColor Red
+    } else {
+        Write-Host "  ✅ Found: $file" -ForegroundColor Gray
+    }
+}
+
+if ($missingFiles.Count -gt 0) {
+    Write-Host "`n❌ ERROR: Missing required files!" -ForegroundColor Red
+    Write-Host "Make sure you're running this script from the 'final' directory" -ForegroundColor Yellow
     Read-Host "Press Enter to exit"
     exit 1
 }
@@ -62,9 +93,11 @@ if (Test-Path "venv312\Scripts\Activate.ps1") {
 # Start Backend
 Write-Host "`nStarting Backend Server..." -ForegroundColor Yellow
 $backendScript = @"
-conda deactivate
-& '$venvPath\Scripts\Activate.ps1'
+Set-Location '$scriptDir'
+try { conda deactivate 2>`$null } catch { }
+& '$scriptDir\$venvPath\Scripts\Activate.ps1'
 `$env:PYTHONWARNINGS='ignore'
+Write-Host 'Backend starting on http://localhost:8000' -ForegroundColor Green
 python backend/app.py
 "@
 
@@ -76,9 +109,11 @@ Start-Sleep -Seconds 5
 # Start Gradio UI
 Write-Host "`nStarting Gradio UI..." -ForegroundColor Yellow
 $uiScript = @"
-conda deactivate
-& '$venvPath\Scripts\Activate.ps1'
+Set-Location '$scriptDir'
+try { conda deactivate 2>`$null } catch { }
+& '$scriptDir\$venvPath\Scripts\Activate.ps1'
 `$env:PYTHONWARNINGS='ignore'
+Write-Host 'Gradio UI starting on http://localhost:7860' -ForegroundColor Green
 python ui/gradio_app.py
 "@
 

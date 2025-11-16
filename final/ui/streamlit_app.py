@@ -26,17 +26,6 @@ def get_health():
         return None
 
 
-def get_emotions():
-    """Get available emotions from API"""
-    try:
-        response = requests.get(f"{API_URL}/emotions", timeout=5)
-        if response.status_code == 200:
-            return response.json()
-        return {}
-    except:
-        return {}
-
-
 def synthesize_speech(text, speaker_file, prompt_text, language, 
                      temperature, top_p, speed, seed, optimize_for_memory):
     """Call TTS API and return audio with metrics"""
@@ -177,7 +166,38 @@ def main():
             
             language = st.selectbox(
                 "Language",
-                options=["en", "zh", "ja", "ko", "fr", "de", "es", "ar"],
+                options=[
+                    "en",  # English
+                    "zh",  # Chinese
+                    "ja",  # Japanese
+                    "ko",  # Korean
+                    "fr",  # French
+                    "de",  # German
+                    "es",  # Spanish
+                    "pl",  # Polish
+                    "ru",  # Russian
+                    "it",  # Italian
+                    "pt",  # Portuguese
+                    "ar",  # Arabic
+                    "hi",  # Hindi
+                    "tr"   # Turkish
+                ],
+                format_func=lambda x: {
+                    "en": "English",
+                    "zh": "中文 (Chinese)",
+                    "ja": "日本語 (Japanese)",
+                    "ko": "한국어 (Korean)",
+                    "fr": "Français (French)",
+                    "de": "Deutsch (German)",
+                    "es": "Español (Spanish)",
+                    "pl": "Polski (Polish)",
+                    "ru": "Русский (Russian)",
+                    "it": "Italiano (Italian)",
+                    "pt": "Português (Portuguese)",
+                    "ar": "العربية (Arabic)",
+                    "hi": "हिन्दी (Hindi)",
+                    "tr": "Türkçe (Turkish)"
+                }.get(x, x),
                 index=0,
                 help="Auto-detected, for reference only"
             )
@@ -215,15 +235,15 @@ def main():
                     st.error(f"Error: {e}")
     
     # Main content tabs
-    tab1, tab2 = st.tabs(["🎙️ Synthesize", "🎭 Emotion Guide"])
+    tab1, tab2 = st.tabs(["🎙️ Synthesize", "💡 Tips"])
     
     with tab1:
         # Text input
         text_input = st.text_area(
             "Text to Synthesize",
-            placeholder="Enter text here... Use (emotion) markers for expressive speech!",
+            placeholder="Enter text here...",
             height=150,
-            help="Add emotion markers like (excited) or (laughing) to control speech"
+            help="Enter the text you want to synthesize"
         )
         
         # Voice cloning section
@@ -294,49 +314,35 @@ def main():
                         st.error(f"❌ Error: {str(e)}")
     
     with tab2:
-        st.header("🎭 Emotion & Control Markers Guide")
+        st.header("💡 Tips for Best Results")
         
-        emotions = get_emotions()
-        
-        if emotions:
-            st.markdown("Add emotion markers to your text using parentheses: `(emotion) text`")
-            
-            st.subheader("Basic Emotions")
-            basic = emotions.get('basic', [])
-            st.write(", ".join(f"`({e})`" for e in basic[:12]))
-            with st.expander("Show all basic emotions"):
-                st.write(", ".join(f"`({e})`" for e in basic))
-            
-            st.subheader("Advanced Emotions")
-            advanced = emotions.get('advanced', [])
-            st.write(", ".join(f"`({e})`" for e in advanced[:12]))
-            with st.expander("Show all advanced emotions"):
-                st.write(", ".join(f"`({e})`" for e in advanced))
-            
-            st.subheader("Tone Markers")
-            tones = emotions.get('tones', [])
-            st.write(", ".join(f"`({t})`" for t in tones))
-            
-            st.subheader("Special Effects")
-            effects = emotions.get('effects', [])
-            st.write(", ".join(f"`({e})`" for e in effects))
-            
-            st.subheader("Examples")
-            st.code("(excited) Hello! This is amazing!")
-            st.code("(whispering) Can you hear me?")
-            st.code("(laughing) That's so funny!")
-            
-            st.info("💡 Emotions work best with English, Chinese, and Japanese")
-        else:
-            st.error("Unable to load emotions. Check API connection.")
-        
-        st.subheader("💡 Tips for Best Results")
         st.markdown("""
-        1. **Reference Audio**: Use 10-30 seconds of clear speech
-        2. **Emotion Markers**: Place at the beginning or end of sentences
-        3. **Multiple Emotions**: You can use multiple markers in one text
-        4. **Temperature**: Lower (0.5-0.7) for consistent speech, higher (0.8-1.2) for variety
-        5. **Quality**: Provide reference transcript for better voice cloning
+        ### Voice Cloning Tips
+        
+        1. **Reference Audio**: Use 10-30 seconds of clear speech for best voice cloning
+        2. **Reference Transcript**: Providing the transcript significantly improves cloning quality
+        3. **Audio Quality**: Use clean audio without background noise
+        4. **Text Length**: Keep text under 200 characters for 4GB GPUs, 600 for 6GB+ GPUs
+        
+        ### Performance Tips
+        
+        5. **Device Selection**: Set `DEVICE` in `.env` file:
+           - `DEVICE=auto` - Smart auto-selection (recommended)
+           - `DEVICE=cuda` - Force GPU mode
+           - `DEVICE=cpu` - Force CPU mode
+        
+        6. **Temperature**: 
+           - Lower (0.5-0.7) for consistent, predictable speech
+           - Higher (0.8-1.2) for more variety and expressiveness
+        
+        7. **Language Support**: Auto-detects from text
+           - Supported: English, Chinese, Japanese, Korean, French, German, Spanish, etc.
+        
+        ### Hardware Recommendations
+        
+        - **4GB GPU (RTX 3050)**: System will auto-use CPU mode (faster than overloaded GPU)
+        - **6GB+ GPU (RTX 3060+)**: GPU mode works great
+        - **CPU-only (i5+)**: ONNX optimization provides good performance (RTF 6-8x)
         """)
     
     # Footer

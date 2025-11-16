@@ -43,27 +43,94 @@ Production-ready web application for zero-shot TTS voice cloning using **OpenAud
 ### Prerequisites
 
 - Python 3.10 or higher
-- CUDA 11.8+ (for GPU acceleration) or CPU
 - 8GB+ RAM (16GB+ recommended)
-- 4GB+ GPU VRAM (for GPU mode)
+- **For GPU users**: NVIDIA GPU with 4GB+ VRAM
 
-### 1. Install Dependencies
+### 1. Check Your CUDA Version (NVIDIA GPU Users)
+
+If you have an NVIDIA GPU, first check your CUDA version:
+
+```powershell
+# Run in PowerShell
+nvidia-smi
+```
+
+Look for the CUDA version in the top-right corner (e.g., "CUDA Version: 12.4").
+
+**Important**: The CUDA version shown by `nvidia-smi` is the **driver version**, not the PyTorch CUDA version. You need to install PyTorch with matching CUDA support.
+
+### 2. Install Dependencies
+
+**Option A: NVIDIA GPU with CUDA 12.x (Recommended for RTX 30/40 series)**
+
+If `nvidia-smi` shows CUDA 12.x:
 
 ```bash
 # Create virtual environment
 python -m venv venv
 
 # Activate virtual environment
-# Windows:
 venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
 
-# Install requirements
+# Install PyTorch with CUDA 12.1 support (compatible with CUDA 12.x)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Install other requirements
 pip install -r requirements.txt
 ```
 
-### 2. Install Fish Speech
+**Option B: NVIDIA GPU with CUDA 11.8**
+
+If `nvidia-smi` shows CUDA 11.x:
+
+```bash
+# Create virtual environment
+python -m venv venv
+venv\Scripts\activate
+
+# Install PyTorch with CUDA 11.8 support
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# Install other requirements
+pip install -r requirements.txt
+```
+
+**Option C: CPU Only (No GPU or AMD GPU)**
+
+```bash
+# Create virtual environment
+python -m venv venv
+venv\Scripts\activate
+
+# Install CPU-only PyTorch
+pip install torch torchvision torchaudio
+
+# Install other requirements
+pip install -r requirements.txt
+```
+
+**Verify GPU Installation:**
+
+After installation, verify PyTorch can see your GPU:
+
+```python
+python -c "import torch; print(f'CUDA Available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
+```
+
+Expected output if successful:
+```
+CUDA Available: True
+GPU: NVIDIA GeForce RTX 3050 Laptop GPU
+```
+
+If you see `CUDA Available: False`, you installed the wrong PyTorch version. Uninstall and reinstall:
+
+```bash
+pip uninstall torch torchvision torchaudio
+# Then use Option A or B above based on your CUDA version
+```
+
+### 3. Install Fish Speech
 
 **Option A: Automated Installation (Recommended)**
 
@@ -81,7 +148,7 @@ install_fish_speech.bat
 # Clone Fish Speech to final folder
 git clone https://github.com/fishaudio/fish-speech.git
 cd fish-speech
-pip install -e .
+uv pip install -e .
 cd ..
 ```
 
@@ -92,7 +159,7 @@ If you already have Fish Speech installed elsewhere, just set the path in `.env`
 FISH_SPEECH_DIR=C:\path\to\your\fish-speech
 ```
 
-### 3. Download Model
+### 4. Download Model
 
 Download the OpenAudio S1-Mini model:
 
@@ -105,7 +172,7 @@ huggingface-cli download fishaudio/openaudio-s1-mini --local-dir checkpoints/ope
 python -c "from huggingface_hub import snapshot_download; snapshot_download('fishaudio/openaudio-s1-mini', local_dir='checkpoints/openaudio-s1-mini')"
 ```
 
-### 4. Configure Environment
+### 5. Configure Environment
 
 ```bash
 # Copy example config
@@ -115,7 +182,7 @@ copy .env.example .env
 # Otherwise, edit .env and set it manually
 ```
 
-### 5. Start the Application
+### 6. Start the Application
 
 **Option A: Using Batch Scripts (Windows)**
 
@@ -143,7 +210,7 @@ python ui/gradio_app.py
 streamlit run ui/streamlit_app.py
 ```
 
-### 6. Access the UI
+### 7. Access the UI
 
 - **Gradio UI**: http://localhost:7860
 - **Streamlit UI**: http://localhost:8501

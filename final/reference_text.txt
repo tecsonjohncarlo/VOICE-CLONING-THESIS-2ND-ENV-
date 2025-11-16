@@ -1,0 +1,6 @@
+ There are like 10 different methods to detect them, to quantify them,
+ to decide what is an outlier, what isn't an outlier.
+ And then you need to decide whether you keep them or remove them.
+ And if you remove them, you need to argument why you remove them. 
+ But then depending on whether you remove them, the results might be a bit different. 
+ So I was dealing with this shit today.

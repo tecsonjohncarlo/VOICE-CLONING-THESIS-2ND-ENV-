@@ -38,16 +38,15 @@ checkpoints/
 
 # Temporary files
 *.npy
-*.wav
 *.mp3
 codes_*.npy
 fake.npy
-fake.wav
 temp_*/
 tmp_*/
 
 # IDE
 .vscode/
+.windsurf/
 .idea/
 *.swp
 *.swo
@@ -64,3 +63,8 @@ logs/
 # Cache
 .cache/
 *.cache
+
+# fish-speech
+fish-speech/
+checkpoints/
+final/fish-speech/
