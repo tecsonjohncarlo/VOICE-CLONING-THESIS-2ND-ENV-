@@ -1,6 +1,6 @@
 {
   "hardware_tier": "intel_low_end",
-  "device_type": "cuda",
+  "device_type": "cpu",
   "cpu_model": "Intel64 Family 15 Model 107 Stepping 1, GenuineIntel",
   "cores_physical": 8,
   "cores_logical": 8,

@@ -21,7 +21,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'threads': 'match_p_cores',
             'mkl_optimization': True,
             'torch_compile': True
@@ -39,7 +39,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'threads': 'match_cores',
             'amd_optimizations': True,
             'torch_compile': True
@@ -74,7 +74,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'threads': 10,
             'thermal_chunking': True
         },
@@ -110,7 +110,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8_aggressive',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'threads': 'match_cores',
             'memory_conservative': True,
             'chunk_size_small': True
@@ -128,7 +128,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': True,
+            'onnx_runtime': false,
             'amd_threading': True,
             'power_management': True
         },

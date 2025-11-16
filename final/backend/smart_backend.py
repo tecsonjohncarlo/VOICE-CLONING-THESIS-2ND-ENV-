@@ -481,7 +481,7 @@ class ConfigurationSelector:
             device='cpu',
             precision='fp32',
             quantization='int8',
-            useonnx=True,  # ✅ 4-5x speedup on CPU
+            useonnx=False, 
             usetorchcompile=True,
             chunk_length=512,
             max_batch_size=2,
@@ -501,7 +501,7 @@ class ConfigurationSelector:
             device='cpu',
             precision='fp32',
             quantization='int8',
-            useonnx=True,  # ✅ Critical for i5
+            useonnx=False,  # ✅ Critical for i5
             usetorchcompile=False,  # Not helpful for single-use
             chunk_length=512,
             max_batch_size=1,
@@ -521,7 +521,7 @@ class ConfigurationSelector:
             device='cpu',
             precision='fp32',
             quantization='int8',
-            useonnx=True,
+            useonnx=False,
             usetorchcompile=False,
             chunk_length=256,
             max_batch_size=1,
