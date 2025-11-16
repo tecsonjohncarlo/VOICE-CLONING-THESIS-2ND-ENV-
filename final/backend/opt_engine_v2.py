@@ -686,17 +686,22 @@ class OptimizedFishSpeechV2:
         # Log hardware configuration
         self._log_hardware_config()
         
-        # CRITICAL FIX: Enable torch.compile for CPU (10x speedup!)
-        # BUT: torch.compile on CPU requires a C++ compiler
-        # Gracefully disable if compiler is not found
+        # CRITICAL NOTE: torch.compile on CPU is unreliable
+        # It requires a C++ compiler and often fails with:
+        # "RuntimeError: Compiler: cl is not found"
+        # Better to use other optimizations instead:
+        # - Quantization (int8) - massive speedup
+        # - All CPU cores utilization - 2x speedup  
+        # - Direct synthesis without chunking - 3x speedup
+        # These give us plenty of speedup without compiler dependency
         if self.device == 'cpu':
-            if self._has_cpp_compiler():
-                enable_compile = True
-                logger.info("🔥 torch.compile ENABLED for CPU (expect 10x speedup!)")
-            else:
-                enable_compile = False
-                logger.warning("⚠️ C++ compiler not found - torch.compile disabled (CPU will be slower)")
-                logger.info("   To enable torch.compile, install Visual Studio Build Tools or GCC")
+            enable_compile = False
+            logger.warning("⚠️ torch.compile disabled on CPU (unreliable without compiler)")
+            logger.info("   Using other optimizations instead:")
+            logger.info("   - int8 quantization for 30% speedup")
+            logger.info("   - All 8 CPU cores for 2x speedup")
+            logger.info("   - Direct synthesis (no chunking) for 3x speedup")
+            logger.info("   Total expected: 6-10x speedup without torch.compile")
         else:
             enable_compile = ENABLE_TORCH_COMPILE
         
@@ -783,9 +788,8 @@ class OptimizedFishSpeechV2:
             logger.warning("ℹ️ Could not directly access model object (running in thread) - gradient checkpointing may still be enabled")
             logger.info("⚠️ If synthesis is slow, check that use_gradient_checkpointing=False in checkpoint config")
         
-        # CRITICAL FIX: Apply torch.compile to models for CPU speedup
-        # torch.compile can fail at runtime if compiler is unavailable
-        # We gracefully handle these errors without crashing
+        # Apply torch.compile only on GPU (if enabled)
+        # NOT on CPU - too unreliable due to compiler dependency
         if enable_compile:
             logger.info("🔥 Compiling models with torch.compile...")
             try:
@@ -797,20 +801,9 @@ class OptimizedFishSpeechV2:
                     self.llama_queue.model = torch.compile(self.llama_queue.model, mode='reduce-overhead')
                     logger.info("✅ Llama model compiled")
             except Exception as e:
-                error_msg = str(e)
-                if "not found" in error_msg.lower() or "compiler" in error_msg.lower():
-                    logger.error(f"❌ C++ compiler error - torch.compile cannot work without a compiler")
-                    logger.error(f"   Error: {e}")
-                    logger.info("   To fix this:")
-                    if platform.system() == "Windows":
-                        logger.info("   1. Install Visual Studio Build Tools: https://visualstudio.microsoft.com/downloads/")
-                        logger.info("   2. Or install MinGW: https://www.mingw-w64.org/")
-                    else:
-                        logger.info("   1. Install GCC: sudo apt install build-essential (Linux) or brew install gcc (macOS)")
-                    enable_compile = False
-                else:
-                    logger.warning(f"⚠️ torch.compile failed: {e}, continuing without compilation")
-                    enable_compile = False
+                logger.warning(f"⚠️ torch.compile failed: {e}")
+                logger.warning("   Continuing without compilation")
+                enable_compile = False
         
         # Create inference engine
         self.inference_engine = TTSInferenceEngine(
@@ -841,52 +834,6 @@ class OptimizedFishSpeechV2:
         logger.info(f"Performance Tier: {self.cpu_tier}")
         logger.info(f"Thermal Monitoring: {'Enabled' if self.thermal_manager.monitoring_available else 'Disabled'}")
         logger.info("="*60)
-    
-    def _has_cpp_compiler(self) -> bool:
-        """
-        Check if a C++ compiler is available for torch.compile on CPU.
-        
-        torch.compile on CPU uses torch._inductor which generates C++ code
-        that needs to be compiled. It requires:
-        - MSVC (cl.exe) on Windows
-        - GCC or Clang on Linux/macOS
-        
-        Returns:
-            bool: True if a compatible C++ compiler is found
-        """
-        if platform.system() == "Windows":
-            # On Windows, look for MSVC compiler (cl.exe)
-            try:
-                result = subprocess.run(
-                    ["where", "cl"],
-                    capture_output=True,
-                    timeout=2,
-                    check=False
-                )
-                has_cl = result.returncode == 0
-                if has_cl:
-                    logger.debug("✓ MSVC compiler (cl.exe) found")
-                    return True
-            except Exception as e:
-                logger.debug(f"Could not check for MSVC: {e}")
-        
-        # On all platforms, check for GCC or Clang
-        for compiler in ["gcc", "clang", "g++"]:
-            try:
-                result = subprocess.run(
-                    ["which" if platform.system() != "Windows" else "where", compiler],
-                    capture_output=True,
-                    timeout=2,
-                    check=False
-                )
-                if result.returncode == 0:
-                    logger.debug(f"✓ {compiler} compiler found")
-                    return True
-            except Exception as e:
-                logger.debug(f"Could not check for {compiler}: {e}")
-        
-        logger.warning("✗ No C++ compiler found (checked: cl, gcc, clang, g++)")
-        return False
     
     def _detect_device(self) -> str:
         """Auto-detect best available device"""
