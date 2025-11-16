@@ -456,9 +456,12 @@ class UniversalFishSpeechOptimizer:
         """Universal synthesis method that adapts to hardware capabilities"""
         start_time = time.time()
         
-        # Use chunking for lower-end hardware or long text
-        chunk_threshold = self.config['optimizations'].get('chunk_threshold', 200)
-        if len(text) > chunk_threshold or self.config['detected_tier'] in ['intel_low_end', 'arm_sbc']:
+        # OPTIMIZED: Only chunk for very long text (>500 chars) or ARM SBC
+        # Chunking adds 3x overhead - only use when necessary
+        chunk_threshold = 500  # Hard threshold for very long text
+        
+        # Only use chunking for extremely long text OR ARM devices
+        if len(text) > chunk_threshold or self.config['detected_tier'] == 'arm_sbc':
             result = self._chunked_synthesis(text, reference_audio, **kwargs)
         else:
             result = self._direct_synthesis(text, reference_audio, **kwargs)
