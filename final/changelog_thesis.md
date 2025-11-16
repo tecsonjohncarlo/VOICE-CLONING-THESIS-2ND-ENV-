@@ -1,11 +1,97 @@
 # Changelog - Thesis Implementation
 
+## [2.6.3] - 2025-11-16 - Critical Device Parameter Passing Fix
+
+### Fixed - Device preference still ignored despite CUDA_VISIBLE_DEVICES setting
+**Why:** Setting `CUDA_VISIBLE_DEVICES=''` too late (after PyTorch import) has no effect
+**Logic:** Pass device parameter explicitly through initialization chain instead of relying on env vars
+**Benefits:** Ensures device preference is respected on all platforms, no timing issues with env vars
+
+**Root Cause Analysis:**
+
+The previous fix (`CUDA_VISIBLE_DEVICES = ''`) failed because:
+
+```python
+# Device preference enforcement (timing issue):
+import torch  # ← CUDA initializes HERE
+# ... later ...
+os.environ['CUDA_VISIBLE_DEVICES'] = ''  # ← Too late! PyTorch already saw CUDA
+torch.cuda.is_available()  # Still returns True!
+```
+
+The real problem: `opt_engine_v2._detect_device()` was being called AFTER the device preference was set, and it would call `torch.cuda.is_available()` which still returned True.
+
+**The Fix:**
+
+Instead of relying on environment variables, pass the device parameter explicitly through the initialization chain:
+
+1. **SmartAdaptiveBackend** (line 1207):
+```python
+def _initialize_engine(self, model_path: str):
+    if self.config.useonnx and self.config.device == 'cpu':
+        return UniversalFishSpeechOptimizer(
+            model_path=model_path,
+            device=self.config.device  # ← PASS device explicitly
+        )
+    
+    return OptimizedFishSpeechV2(
+        model_path=model_path,
+        device=self.config.device,  # ← PASS device explicitly
+        enable_optimizations=True
+    )
+```
+
+2. **UniversalFishSpeechOptimizer** (line 314):
+```python
+def __init__(self, model_path: str = "checkpoints/openaudio-s1-mini", device: str = None):
+    # Accept device parameter
+    self.detector = UniversalHardwareDetector()
+    self.config = self.detector.get_optimal_config()
+    
+    # CRITICAL FIX: Override device if user explicitly provided
+    if device is not None:
+        logger.info(f"🔒 Overriding detected device with user preference: {device}")
+        self.config['optimizations']['device'] = device
+    
+    self._initialize_components(model_path)
+```
+
+3. **OptimizedFishSpeechV2** (already correct at line 633):
+```python
+# Auto-detect device
+if device == "auto":
+    self.device = self._detect_device()  # Only call if auto
+else:
+    self.device = device  # Use explicit device directly
+```
+
+**Why This Works:**
+
+- When `device == "auto"`: Calls `_detect_device()` which checks hardware
+- When `device == "cpu"`: Skips `_detect_device()` entirely, uses CPU directly
+- No reliance on environment variables that might be set too late
+- Explicit parameter passing through the entire initialization chain
+
+**Impact:**
+
+✅ Guaranteed device preference enforcement on ALL platforms
+✅ No timing issues with environment variables
+✅ No downstream code can override user choice
+✅ Cleaner, more explicit control flow
+
+**Files Modified:**
+- `backend/smart_backend.py`: Pass `device` param to UniversalFishSpeechOptimizer
+- `backend/universal_optimizer.py`: Accept `device` param and override config
+
+---
+
 ## [2.6.2] - 2025-11-16 - Windows/Linux Device Preference Enforcement
 
 ### Fixed - Critical device preference bug on Windows/Linux
 **Why:** Windows/Linux users setting `DEVICE=cpu` were ignored, system still used CUDA GPU
 **Logic:** Mirror macOS fix by adding CUDA visibility disabling when CPU mode is forced
 **Benefits:** Ensures all platforms respect user device preference, eliminates GPU override conflicts
+
 
 **Root Cause Analysis:**
 

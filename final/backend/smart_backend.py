@@ -1212,7 +1212,8 @@ class SmartAdaptiveBackend:
             try:
                 from universal_optimizer import UniversalFishSpeechOptimizer
                 logger.info("📦 Loading Universal Optimizer with ONNX Runtime")
-                return UniversalFishSpeechOptimizer(model_path=model_path)
+                # CRITICAL FIX: Pass device to UniversalOptimizer to ensure user preference is respected
+                return UniversalFishSpeechOptimizer(model_path=model_path, device=self.config.device)
             except ImportError as e:
                 logger.warning(f"Universal Optimizer not available: {e}")
                 logger.info("Falling back to standard engine")

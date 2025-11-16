@@ -312,10 +312,22 @@ def print_platform_expectations(config: Dict[str, Any]):
 class UniversalFishSpeechOptimizer:
     """Universal optimizer that adapts to any hardware"""
     
-    def __init__(self, model_path: str = "checkpoints/openaudio-s1-mini"):
+    def __init__(self, model_path: str = "checkpoints/openaudio-s1-mini", device: str = None):
+        """Initialize Universal Optimizer
+        
+        Args:
+            model_path: Path to model checkpoint
+            device: Optional device override (auto, cpu, cuda, mps). If None, uses detected config.
+        """
         # Detect hardware
         self.detector = UniversalHardwareDetector()
         self.config = self.detector.get_optimal_config()
+        
+        # CRITICAL FIX: Override device if user explicitly provided
+        # This ensures user preference (e.g., DEVICE=cpu) is respected throughout the chain
+        if device is not None:
+            logger.info(f"🔒 Overriding detected device '{self.config['optimizations'].get('device')}' with user preference: '{device}'")
+            self.config['optimizations']['device'] = device
         
         # Log detected configuration
         self._log_configuration()
