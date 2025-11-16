@@ -87,6 +87,7 @@ filelists/
 *.pickle
 *.lab
 /fish_speech/text/cmudict_cache.pickle
+final/fish-speech/
 
 # Cache and Temporary Files
 # --------------------------
