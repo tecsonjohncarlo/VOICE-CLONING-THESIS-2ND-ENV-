@@ -1157,6 +1157,18 @@ class OptimizedFishSpeechV2:
                     if warning:
                         logger.info(warning)
             
+            # Check M1 Air throttling status
+            if self.cpu_tier == 'm1_air':
+                throttle_state = self.thermal_manager.predict_throttling_behavior(latency_ms / 1000)
+                if throttle_state['throttled']:
+                    logger.warning(f"⚠️  {throttle_state['message']}")
+                    logger.info(f"   Runtime: {throttle_state['runtime_minutes']:.1f} minutes")
+                    logger.info(f"   Performance loss: {throttle_state['expected_performance_loss']}")
+                else:
+                    warning = self.thermal_manager.get_throttle_warning()
+                    if warning:
+                        logger.info(warning)
+            
             # Record metrics
             self.monitor.record_latency(latency_ms)
             self.monitor.record_vram(peak_vram_mb)
