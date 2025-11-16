@@ -624,6 +624,19 @@ class OptimizedFishSpeechV2:
         self.enable_optimizations = enable_optimizations
         self.optimize_for_memory = optimize_for_memory
         
+        # Make path absolute if it's relative
+        # This ensures the path works regardless of current working directory
+        if not self.model_path.is_absolute():
+            # Try relative to current working directory first
+            if not self.model_path.exists():
+                # Try relative to backend directory
+                backend_dir = Path(__file__).parent
+                final_dir = backend_dir.parent
+                alt_path = final_dir / self.model_path
+                if alt_path.exists():
+                    self.model_path = alt_path
+                    logger.info(f"✓ Resolved model path to: {self.model_path}")
+        
         # Universal hardware detection
         self.hw_detector = UniversalHardwareDetector()
         self.cpu_tier = self.hw_detector.detect_cpu_tier()

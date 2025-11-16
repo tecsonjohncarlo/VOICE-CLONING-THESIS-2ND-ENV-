@@ -61,7 +61,21 @@ async def lifespan(app: FastAPI):
     global engine, monitor
     
     # Startup
-    model_path = os.getenv("MODEL_DIR", "checkpoints/openaudio-s1-mini")
+    # Resolve model path relative to backend directory (or use absolute path from env)
+    model_dir_env = os.getenv("MODEL_DIR")
+    if model_dir_env:
+        # Use env variable if set (can be absolute or relative)
+        model_path = model_dir_env
+        if not Path(model_path).is_absolute():
+            # Make it relative to parent of backend directory (i.e., the final directory)
+            backend_dir = Path(__file__).parent
+            final_dir = backend_dir.parent
+            model_path = str(final_dir / model_path)
+    else:
+        # Default: relative to final directory
+        backend_dir = Path(__file__).parent
+        final_dir = backend_dir.parent
+        model_path = str(final_dir / "checkpoints" / "openaudio-s1-mini")
     
     try:
         # Initialize Smart Adaptive Backend
