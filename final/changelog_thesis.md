@@ -1,5 +1,78 @@
 # Changelog - Thesis Implementation
 
+## [2.6.2] - 2025-11-16 - Windows/Linux Device Preference Enforcement
+
+### Fixed - Critical device preference bug on Windows/Linux
+**Why:** Windows/Linux users setting `DEVICE=cpu` were ignored, system still used CUDA GPU
+**Logic:** Mirror macOS fix by adding CUDA visibility disabling when CPU mode is forced
+**Benefits:** Ensures all platforms respect user device preference, eliminates GPU override conflicts
+
+**Root Cause Analysis:**
+
+While macOS had explicit backend disabling (`PYTORCH_ENABLE_MPS_FALLBACK=0`), Windows/Linux were missing the equivalent CUDA disabling code:
+
+```python
+# macOS (already working)
+if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '0'  # ✅ Backend explicitly disabled
+
+# Windows/Linux (was missing this)
+if torch.cuda.is_available():
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''  # ✅ NOW ADDED: Hide all GPUs
+    torch.cuda.empty_cache()  # ✅ NOW ADDED: Clear cached state
+```
+
+**The Problem:**
+
+On Windows/Linux with `DEVICE=cpu`:
+1. `_apply_user_device_preference()` set `has_gpu = False` ✅
+2. But CUDA was still visible to PyTorch ❌
+3. Downstream code (`opt_engine_v2._detect_device()`) saw CUDA available and overrode to GPU ❌
+4. Result: GPU was used despite `DEVICE=cpu` setting ❌
+
+**The Fix:**
+
+Added Windows/Linux equivalent CUDA disabling code:
+
+```python
+def _apply_user_device_preference(self, user_device: str):
+    if user_device == 'cpu':
+        logger.info("✅ Forcing CPU mode (user preference)")
+        self.profile.device_type = 'cpu'
+        self.profile.has_gpu = False
+        
+        # CRITICAL FIX: Disable MPS explicitly when forcing CPU (macOS)
+        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
+            logger.info("🔒 MPS backend disabled - using CPU only")
+        
+        # CRITICAL FIX: Disable CUDA explicitly when forcing CPU (Windows/Linux)
+        if torch.cuda.is_available():
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Hide all GPUs from PyTorch
+            logger.info("🚫 CUDA disabled - GPU hidden, using CPU only")
+            
+            # Clear any cached CUDA state to ensure clean CPU mode
+            try:
+                if hasattr(torch.cuda, 'empty_cache'):
+                    torch.cuda.empty_cache()
+                    logger.debug("   CUDA cache cleared")
+            except Exception as e:
+                logger.debug(f"   Could not clear CUDA cache: {e}")
+```
+
+**Impact:**
+
+Now all platforms (macOS, Windows, Linux) correctly enforce user device preference:
+
+✅ macOS: `DEVICE=cpu` → MPS disabled → CPU used
+✅ Windows: `DEVICE=cpu` → CUDA disabled → CPU used  
+✅ Linux: `DEVICE=cpu` → CUDA disabled → CPU used
+
+**Files Modified:**
+- `backend/smart_backend.py`: Added CUDA disabling code in `_apply_user_device_preference()`
+
+---
+
 ## [2.6.1] - 2025-11-12 - EMERGENCY FIXES: M1 Air Gradient Checkpointing & Device Conflicts
 
 ### Fixed - Critical gradient checkpointing and device preference bugs causing hangs

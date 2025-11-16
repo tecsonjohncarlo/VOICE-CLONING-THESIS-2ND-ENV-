@@ -1103,11 +1103,25 @@ class SmartAdaptiveBackend:
             self.profile.device_type = 'cpu'
             self.profile.has_gpu = False
             
-            # CRITICAL FIX: Disable MPS explicitly when forcing CPU
+            # CRITICAL FIX: Disable MPS explicitly when forcing CPU (macOS)
             import os
             if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
                 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "0"
                 logger.info("🔒 MPS backend disabled - using CPU only")
+            
+            # CRITICAL FIX: Disable CUDA explicitly when forcing CPU (Windows/Linux)
+            # Without this, downstream code sees CUDA available and overrides to GPU
+            if torch.cuda.is_available():
+                os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Hide all GPUs from PyTorch
+                logger.info("🚫 CUDA disabled - GPU hidden, using CPU only")
+                
+                # Clear any cached CUDA state to ensure clean CPU mode
+                try:
+                    if hasattr(torch.cuda, 'empty_cache'):
+                        torch.cuda.empty_cache()
+                        logger.debug("   CUDA cache cleared")
+                except Exception as e:
+                    logger.debug(f"   Could not clear CUDA cache: {e}")
         elif user_device == 'cuda':
             if torch.cuda.is_available():
                 logger.info("✅ Forcing CUDA mode (user preference)")

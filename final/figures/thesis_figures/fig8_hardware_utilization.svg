@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="1061.882216pt" height="361.466536pt" viewBox="0 0 1061.882216 361.466536" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2025-11-13T22:34:57.167148</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.7, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 361.466536 
+L 1061.882216 361.466536 
+L 1061.882216 0 
+L 0 0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="matplotlib.axis_1"/>
+   <g id="matplotlib.axis_2"/>
+   <g id="patch_2">
+    <path d="M 183.105679 99.167623 
+C 168.129312 99.167623 153.300298 102.135037 139.477162 107.898066 
+C 125.654027 113.661096 113.108784 122.106336 102.567739 132.744848 
+C 92.026694 143.383361 83.697275 156.005801 78.061714 169.881392 
+C 72.426154 183.756984 69.595348 198.612681 69.733187 213.588414 
+C 69.871026 228.564148 72.974796 243.365222 78.864807 257.134731 
+C 84.754817 270.904239 93.315162 283.371223 104.050242 293.813908 
+C 114.785321 304.256592 127.483888 312.469484 141.41076 317.977098 
+C 155.337632 323.484713 170.218755 326.17867 185.192585 325.903004 
+L 183.105679 212.544918 
+z
+" style="fill: #0173b2"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 185.192585 325.903004 
+C 215.0651 325.353056 243.541707 313.016641 264.374669 291.600356 
+C 285.207632 270.18407 296.753158 241.377732 296.478172 211.501421 
+C 296.203186 181.625109 284.129386 153.036167 262.905749 132.006977 
+C 241.682112 110.977786 212.983256 99.167623 183.105679 99.167623 
+L 183.105679 212.544918 
+z
+" style="fill: #ecf0f1"/>
+   </g>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: end; fill: #262626" x="58.395938" y="216.176202" transform="rotate(-0 58.395938 216.176202)">RAM Used</text>
+   </g>
+   <g id="text_2">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: middle; fill: #262626" x="115.082184" y="215.654453" transform="rotate(-0 115.082184 215.654453)">50.3%</text>
+   </g>
+   <g id="text_3">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: start; fill: #262626" x="307.815421" y="213.880509" transform="rotate(-0 307.815421 213.880509)">Available</text>
+   </g>
+   <g id="text_4">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: middle; fill: #262626" x="251.129175" y="214.402257" transform="rotate(-0 251.129175 214.402257)">49.7%</text>
+   </g>
+   <g id="text_5">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(143.560679 52.505705)">M1 Air (CPU)</text>
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(128.24232 64.823299)">(MacBook Air M1)</text>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="matplotlib.axis_3"/>
+   <g id="matplotlib.axis_4"/>
+   <g id="patch_4">
+    <path d="M 548.033139 99.167623 
+C 527.675996 99.167623 507.689707 104.650378 490.182065 115.037665 
+C 472.674423 125.424953 458.283316 140.338315 448.526456 158.204959 
+C 438.769597 176.071603 434.002475 196.240561 434.727841 216.584777 
+C 435.453206 236.928993 441.644631 256.707228 452.649155 273.833633 
+L 548.033139 212.544918 
+z
+" style="fill: #de8f05"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 452.649155 273.833633 
+C 461.803572 288.080706 474.034776 300.097392 488.441582 308.998312 
+C 502.848388 317.899233 519.068062 323.460281 535.905554 325.271723 
+C 552.743046 327.083165 569.774421 325.099394 585.744823 319.46657 
+C 601.715226 313.833747 616.222553 304.693695 628.197918 292.719846 
+C 640.173284 280.745996 649.315172 266.239826 654.950017 250.270137 
+C 660.584862 234.300447 662.570789 217.269324 660.761478 200.431603 
+C 658.952167 183.593882 653.393173 167.373504 644.494076 152.965571 
+C 635.594979 138.557638 623.579842 126.324913 609.333927 117.168693 
+L 548.033139 212.544918 
+z
+" style="fill: #95a5a6"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 609.333927 117.168693 
+C 600.237996 111.3225 590.352342 106.80746 579.977728 103.760938 
+C 569.603113 100.714416 558.845829 99.167624 548.033155 99.167623 
+L 548.033139 212.544918 
+z
+" style="fill: #ecf0f1"/>
+   </g>
+   <g id="text_6">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(373.223132 150.145072)">GPU Memory</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(413.364538 160.293416)">Used</text>
+   </g>
+   <g id="text_7">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: middle; fill: #262626" x="488.329129" y="182.42438" transform="rotate(-0 488.329129 182.42438)">34.1%</text>
+   </g>
+   <g id="text_8">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: start; fill: #262626" x="636.214396" y="303.220776" transform="rotate(-0 636.214396 303.220776)">RAM Used</text>
+   </g>
+   <g id="text_9">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: middle; fill: #262626" x="596.132007" y="263.133312" transform="rotate(-0 596.132007 263.133312)">56.8%</text>
+   </g>
+   <g id="text_10">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: start; fill: #262626" x="583.172187" y="95.365978" transform="rotate(-0 583.172187 95.365978)">Available</text>
+   </g>
+   <g id="text_11">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: middle; fill: #262626" x="567.199892" y="149.757967" transform="rotate(-0 567.199892 149.757967)">9.1%</text>
+   </g>
+   <g id="text_12">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(507.556576 52.505705)">M1 Air (MPS)</text>
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(493.169779 64.823299)">(MacBook Air M1)</text>
+   </g>
+  </g>
+  <g id="axes_3">
+   <g id="matplotlib.axis_5"/>
+   <g id="matplotlib.axis_6"/>
+   <g id="patch_7">
+    <path d="M 912.960598 99.167623 
+C 904.874025 99.167623 896.81061 100.032778 888.908103 101.748309 
+C 881.005597 103.46384 873.309259 106.019921 865.950571 109.372885 
+L 912.960598 212.544918 
+z
+" style="fill: #029e73"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 865.950571 109.372885 
+C 843.547596 119.580733 825.067619 136.812965 813.3211 158.448878 
+C 801.574581 180.084791 797.188796 204.969009 800.830741 229.317103 
+L 912.960598 212.544918 
+z
+" style="fill: #95a5a6"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 800.830741 229.317103 
+C 804.041655 250.783556 813.350425 270.883096 827.645671 287.216024 
+C 841.940916 303.548952 860.63015 315.438328 881.482051 321.464668 
+C 902.333953 327.491009 924.484286 327.404546 945.288505 321.215601 
+C 966.092724 315.026656 984.68857 302.991739 998.855871 286.547708 
+C 1013.023172 270.103677 1022.174745 249.932077 1025.217976 228.441211 
+C 1028.261206 206.950345 1025.069965 185.030931 1016.025255 165.299945 
+C 1006.980546 145.56896 992.457239 128.844179 974.189283 117.122389 
+C 955.921328 105.400598 934.665864 99.167623 912.960598 99.167623 
+L 912.960598 212.544918 
+z
+" style="fill: #ecf0f1"/>
+   </g>
+   <g id="text_13">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(821.150198 88.042757)">GPU Memory</text>
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(861.291604 98.191101)">Used</text>
+   </g>
+   <g id="text_14">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: middle; fill: #262626" x="898.529101" y="148.55039" transform="rotate(-0 898.529101 148.55039)">6.8%</text>
+   </g>
+   <g id="text_15">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: end; fill: #262626" x="803.35715" y="155.522712" transform="rotate(-0 803.35715 155.522712)">RAM Used</text>
+   </g>
+   <g id="text_16">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: middle; fill: #262626" x="853.176899" y="182.570731" transform="rotate(-0 853.176899 182.570731)">20.6%</text>
+   </g>
+   <g id="text_17">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: start; fill: #262626" x="1007.445399" y="296.431425" transform="rotate(-0 1007.445399 296.431425)">Available</text>
+   </g>
+   <g id="text_18">
+    <text style="font-weight: 700; font-size: 9px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: middle; fill: #262626" x="964.497762" y="259.430029" transform="rotate(-0 964.497762 259.430029)">72.6%</text>
+   </g>
+   <g id="text_19">
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(872.956692 52.505705)">V100 (CUDA)</text>
+    <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; fill: #262626" transform="translate(868.507707 64.823299)">(NVIDIA V100)</text>
+   </g>
+  </g>
+  <g id="text_20">
+   <text style="font-weight: 700; font-size: 13px; font-family: 'DejaVu Sans', 'Arial', 'Helvetica', sans-serif; text-anchor: middle; fill: #262626" x="532.507637" y="17.077969" transform="rotate(-0 532.507637 17.077969)">Figure 8: Hardware Resource Utilization Patterns</text>
+  </g>
+ </g>
+</svg>
