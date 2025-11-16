@@ -502,7 +502,7 @@ class ConfigurationSelector:
             precision='fp32',
             quantization='int8',
             useonnx=False,  # ✅ Critical for i5
-            usetorchcompile=False,  # Not helpful for single-use
+            usetorchcompile=True,  # Not helpful for single-use
             chunk_length=512,
             max_batch_size=1,
             num_threads=10,  # i5-1334U/1235U has 10 cores
@@ -522,7 +522,7 @@ class ConfigurationSelector:
             precision='fp32',
             quantization='int8',
             useonnx=False,
-            usetorchcompile=False,
+            usetorchcompile=True,
             chunk_length=256,
             max_batch_size=1,
             num_threads=self.profile.cores_physical,
