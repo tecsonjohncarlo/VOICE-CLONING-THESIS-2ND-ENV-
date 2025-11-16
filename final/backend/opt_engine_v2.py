@@ -843,6 +843,14 @@ class OptimizedFishSpeechV2:
         logger.info(f"Using CPU: {platform.system()} - {platform.processor()}")
         return "cpu"
     
+    def _unwrap_compiled_model(self, model):
+        """Unwrap torch.compile's OptimizedModule wrapper to access original model"""
+        # torch.compile wraps models in OptimizedModule, which has _orig_mod attribute
+        if hasattr(model, '_orig_mod'):
+            logger.debug("Unwrapping torch.compile OptimizedModule wrapper")
+            return model._orig_mod
+        return model
+    
     def _get_precision_mode(self) -> str:
         """Determine optimal precision mode based on device"""
         if MIXED_PRECISION == "auto":
