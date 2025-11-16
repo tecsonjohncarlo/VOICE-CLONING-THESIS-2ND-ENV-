@@ -406,16 +406,23 @@ class ONNXOptimizer:
             if str(fish_speech_dir) not in sys.path:
                 sys.path.insert(0, str(fish_speech_dir))
             
-            from fish_speech.text import clean_text, text_to_sequence
+            # FIXED: Only import clean_text (text_to_sequence doesn't exist in public API)
+            from fish_speech.text import clean_text
             
             # Step 1: Text preprocessing (PyTorch - fast, not worth ONNX)
             logger.debug("Step 1: Text preprocessing")
             cleaned_text = clean_text(text)
-            text_tokens = text_to_sequence(cleaned_text)
             
-            # Convert to numpy for ONNX
-            input_ids = np.array([text_tokens], dtype=np.int64)
-            attention_mask = np.ones_like(input_ids, dtype=np.int64)
+            # NOTE: Text tokenization is handled internally by the Fish Speech model
+            # We don't need text_to_sequence - the model does this automatically
+            # For ONNX inference, we would need to call the PyTorch engine to get tokens
+            # This is a limitation - ONNX optimization requires access to internal tokenizer
+            
+            raise NotImplementedError(
+                "ONNX text-to-sequence conversion requires access to Fish Speech's "
+                "internal tokenizer, which is not exposed in the public API. "
+                "Falling back to PyTorch."
+            )
             
             # Step 2: Text2Semantic inference (ONNX - 5x speedup)
             logger.debug("Step 2: Text2Semantic inference (ONNX)")

@@ -1,11 +1,69 @@
 # Changelog - Thesis Implementation
 
+## [2.6.4] - 2025-11-16 - Fixed Broken ONNX Optimizer Import
+
+### Fixed - ONNX optimizer crashing due to non-existent text_to_sequence import
+**Why:** `text_to_sequence` function doesn't exist in Fish Speech's public API
+**Logic:** Remove broken import and raise NotImplementedError with clear message
+**Benefits:** Prevents crashes, allows graceful fallback to PyTorch
+
+**Root Cause Analysis:**
+
+The ONNX optimizer was trying to import `text_to_sequence` from `fish_speech.text`:
+
+```python
+# Line 408 - BROKEN:
+from fish_speech.text import clean_text, text_to_sequence
+text_tokens = text_to_sequence(cleaned_text)  # ← Function doesn't exist!
+# ImportError or AttributeError
+```
+
+This function doesn't exist in the Fish Speech public API. The actual text-to-token conversion happens inside the Llama model, which we can't access from ONNX Runtime (since we'd need to run PyTorch code anyway).
+
+**The Fix:**
+
+Remove the non-existent import and raise `NotImplementedError` to trigger fallback:
+
+```python
+# Line 410 - FIXED:
+from fish_speech.text import clean_text  # ← Only import what exists
+
+cleaned_text = clean_text(text)
+
+# NOTE: Text tokenization is handled internally by Fish Speech
+# We don't need text_to_sequence - the model does this automatically
+
+raise NotImplementedError(
+    "ONNX text-to-sequence conversion requires access to Fish Speech's "
+    "internal tokenizer, which is not exposed in the public API. "
+    "Falling back to PyTorch."
+)
+```
+
+This is the correct behavior because:
+- Text tokenization happens inside the Llama model
+- The model runs on PyTorch, not ONNX
+- ONNX can only optimize the inference, not the tokenization
+- Better to fall back to PyTorch than crash with broken imports
+
+**Impact:**
+
+✅ ONNX optimizer gracefully falls back to PyTorch (no crashes)
+✅ Clear error message explains the limitation
+✅ Users understand why ONNX isn't being used
+
+**Files Modified:**
+- `backend/onnx_optimizer.py`: Fixed import and added NotImplementedError
+
+---
+
 ## [2.6.3] - 2025-11-16 - Critical Device Parameter Passing Fix
 
 ### Fixed - Device preference still ignored despite CUDA_VISIBLE_DEVICES setting
 **Why:** Setting `CUDA_VISIBLE_DEVICES=''` too late (after PyTorch import) has no effect
 **Logic:** Pass device parameter explicitly through initialization chain instead of relying on env vars
 **Benefits:** Ensures device preference is respected on all platforms, no timing issues with env vars
+
 
 **Root Cause Analysis:**
 
