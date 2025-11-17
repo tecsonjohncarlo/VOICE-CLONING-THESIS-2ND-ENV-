@@ -1,0 +1,217 @@
+PS C:\Users\tecso> cd C:\Users\tecso\OneDrive\Desktop\VOICE-CLONING-THESIS-2ND-ENV-\final
+PS C:\Users\tecso\OneDrive\Desktop\VOICE-CLONING-THESIS-2ND-ENV-\final> venv\Scripts\activate
+(venv) PS C:\Users\tecso\OneDrive\Desktop\VOICE-CLONING-THESIS-2ND-ENV-\final> python backend/app.py
+[INFO] Using SmartAdaptiveBackend (auto-optimizing)
+======================================================================
+Starting Fish Speech TTS API with Smart Adaptive Backend
+======================================================================
+Features:
+  ✅ Automatic hardware detection
+  ✅ Self-optimizing configuration
+  ✅ Real-time resource monitoring
+  ✅ Adaptive performance tuning
+======================================================================
+[INFO] Using SmartAdaptiveBackend (auto-optimizing)
+INFO:     Started server process [15496]
+INFO:     Waiting for application startup.
+2025-11-17 16:42:08.640 | INFO     | smart_backend:__init__:1024 - 🚀 Initializing Smart Adaptive Backend
+2025-11-17 16:42:08.752 | INFO     | smart_backend:_detect_gpu:190 - ✅ NVIDIA GPU detected: NVIDIA GeForce RTX 4050 Laptop GPU
+2025-11-17 16:42:08.753 | INFO     | smart_backend:__init__:67 - 🔍 Hardware detection complete
+2025-11-17 16:42:08.753 | INFO     | smart_backend:_log_detection_results:244 - ======================================================================
+2025-11-17 16:42:08.753 | INFO     | smart_backend:_log_detection_results:245 - DETECTED HARDWARE PROFILE
+2025-11-17 16:42:08.753 | INFO     | smart_backend:_log_detection_results:246 - ======================================================================
+2025-11-17 16:42:08.753 | INFO     | smart_backend:_log_detection_results:247 - System: Windows (AMD64)
+2025-11-17 16:42:08.753 | INFO     | smart_backend:_log_detection_results:248 - CPU: AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD
+2025-11-17 16:42:08.754 | INFO     | smart_backend:_log_detection_results:249 - CPU Tier: amd_mobile
+2025-11-17 16:42:08.754 | INFO     | smart_backend:_log_detection_results:250 - Cores: 6 physical, 12 logical
+2025-11-17 16:42:08.754 | INFO     | smart_backend:_log_detection_results:251 - RAM: 7.2 GB
+2025-11-17 16:42:08.754 | INFO     | smart_backend:_log_detection_results:252 -
+2025-11-17 16:42:08.754 | INFO     | smart_backend:_log_detection_results:253 - GPU: NVIDIA GeForce RTX 4050 Laptop GPU
+2025-11-17 16:42:08.754 | INFO     | smart_backend:_log_detection_results:254 - GPU Memory: 6.0 GB
+2025-11-17 16:42:08.754 | INFO     | smart_backend:_log_detection_results:255 - Device: cuda
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_detection_results:256 -
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_detection_results:257 - Thermal Monitoring: ❌ Not Available
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_detection_results:258 - AVX-512 VNNI: ❌ Not Supported
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_detection_results:260 - CUDA Compute: 8.9
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_detection_results:261 - ======================================================================
+2025-11-17 16:42:08.755 | INFO     | smart_backend:__init__:1040 - 🤖 Smart auto-selection enabled (will optimize based on system load)
+2025-11-17 16:42:08.755 | DEBUG    | smart_backend:select_optimal_config:279 - GPU check: has_gpu=True, gpu_memory_gb=6.00
+2025-11-17 16:42:08.755 | WARNING  | smart_backend:select_optimal_config:286 - ⚠️ GPU detected but insufficient VRAM: 6.00GB < 6.0GB required
+2025-11-17 16:42:08.755 | WARNING  | smart_backend:select_optimal_config:287 - ⚠️ 4GB GPUs cause memory overflow (5.97GB usage) - using CPU mode instead
+2025-11-17 16:42:08.755 | INFO     | smart_backend:select_optimal_config:288 - 💡 CPU mode with ONNX will provide better performance than overloaded GPU
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_selected_config:1079 - ======================================================================
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_selected_config:1080 - SELECTED OPTIMAL CONFIGURATION
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_selected_config:1081 - ======================================================================
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_selected_config:1082 - Strategy: mobile_efficient
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_selected_config:1083 - Device: cpu
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_selected_config:1084 - Precision: fp32
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_selected_config:1085 - Quantization: int8
+2025-11-17 16:42:08.755 | INFO     | smart_backend:_log_selected_config:1086 - ONNX Runtime: ✅ Enabled
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1087 - torch.compile: ❌ Disabled
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1088 - Chunk Length: 256
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1089 - Threads: 4
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1090 - Max Text Length: 250 characters
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1091 -
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1092 - Expected Performance:
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1093 -   RTF: 10.0x (slower than real-time)
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1094 -   Memory: 3.0 GB
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1095 -
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1096 - Notes: Mobile-optimized with aggressive thermal management
+2025-11-17 16:42:08.756 | INFO     | smart_backend:_log_selected_config:1097 - ======================================================================
+2025-11-17 16:42:08.764 | INFO     | smart_backend:_apply_configuration:1205 - 🔧 Configuration applied
+2025-11-17 16:42:08.767 | INFO     | smart_backend:_initialize_engine:1214 - 📦 Loading Universal Optimizer with ONNX Runtime
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:__init__:329 - 🔒 Overriding detected device 'None' with user preference: 'cpu'
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:347 - ======================================================================
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:348 - DETECTED HARDWARE
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:349 - ======================================================================
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:350 - CPU: AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:351 - Cores: 6 physical, 12 logical
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:352 - Memory: 7.2 GB
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:353 - System: Windows
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:354 - Tier: amd_mobile
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:357 -
+2025-11-17 16:42:08.768 | INFO     | universal_optimizer:_log_configuration:358 - OPTIMIZATION STRATEGY
+2025-11-17 16:42:08.769 | INFO     | universal_optimizer:_log_configuration:359 -   Precision: fp16
+2025-11-17 16:42:08.769 | INFO     | universal_optimizer:_log_configuration:360 -   Quantization: int8
+2025-11-17 16:42:08.769 | INFO     | universal_optimizer:_log_configuration:361 -   ONNX Runtime: False
+2025-11-17 16:42:08.769 | INFO     | universal_optimizer:_log_configuration:362 -   Torch Compile: False
+2025-11-17 16:42:08.769 | INFO     | universal_optimizer:_log_configuration:363 -   Threads: auto
+2025-11-17 16:42:08.769 | INFO     | universal_optimizer:_log_configuration:364 - ======================================================================
+2025-11-17 16:42:08.769 | INFO     | platform_matrix:print_platform_compatibility:88 - ======================================================================
+2025-11-17 16:42:08.769 | INFO     | platform_matrix:print_platform_compatibility:89 - PLATFORM COMPATIBILITY
+2025-11-17 16:42:08.769 | INFO     | platform_matrix:print_platform_compatibility:90 - ======================================================================
+2025-11-17 16:42:08.769 | INFO     | platform_matrix:print_platform_compatibility:102 - Thermal Monitoring: Requires external tools (LibreHardwareMonitor/Core Temp)
+2025-11-17 16:42:08.769 | INFO     | platform_matrix:print_platform_compatibility:102 - Torch Compile: Supported with TorchInductor
+2025-11-17 16:42:08.769 | INFO     | platform_matrix:print_platform_compatibility:102 - Mixed Precision: FP16 supported on compatible GPUs
+2025-11-17 16:42:08.769 | INFO     | platform_matrix:print_platform_compatibility:102 - Quantization: INT8 supported
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_platform_compatibility:102 - User Action Required: Install temperature monitoring tool
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_platform_compatibility:102 - Fallback Behavior: No thermal protection
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_platform_compatibility:94 - Recommended Tools:
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_platform_compatibility:96 -   - LibreHardwareMonitor: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_platform_compatibility:96 -   - Core Temp: https://www.alcpu.com/CoreTemp/
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_platform_compatibility:96 -   - HWiNFO64: https://www.hwinfo.com/download/
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_platform_compatibility:104 - ======================================================================
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_performance_expectations:186 - ======================================================================
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_performance_expectations:187 - PERFORMANCE EXPECTATIONS - AMD_MOBILE
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_performance_expectations:188 - ======================================================================
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_performance_expectations:189 - Expected RTF: 10.0
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_performance_expectations:194 - 10s clip: 100s
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_performance_expectations:195 - 30s clip: 5min
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_performance_expectations:196 - Quality: good
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_performance_expectations:197 - Notes: Mobile Ryzen CPUs, competitive performance
+2025-11-17 16:42:08.770 | INFO     | platform_matrix:print_performance_expectations:202 - ======================================================================
+2025-11-17 16:42:18.751 | WARNING  | opt_engine_v2:_init_windows_monitoring:231 - Windows temperature monitoring requires external tools.
+   Install one of these for thermal management:
+   - LibreHardwareMonitor: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
+   - Core Temp: https://www.alcpu.com/CoreTemp/
+   - HWiNFO64: https://www.hwinfo.com/download/
+2025-11-17 16:42:18.751 | DEBUG    | opt_engine_v2:_try_libre_hardware_monitor:261 - LibreHardwareMonitor unavailable: No module named 'wmi'
+2025-11-17 16:42:18.752 | WARNING  | opt_engine_v2:_init_windows_monitoring:251 - ❌ No thermal monitoring available - continuing without thermal protection
+2025-11-17 16:42:18.754 | WARNING  | opt_engine_v2:__init__:484 - ⚠️ pynvml not installed - GPU utilization will show 0%. Install with: pip install nvidia-ml-py3
+2025-11-17 16:42:18.761 | INFO     | opt_engine_v2:_apply_system_optimizations:927 - CPU threads: 12/12 (using all cores for 2x speedup)
+2025-11-17 16:42:18.761 | INFO     | opt_engine_v2:_log_hardware_config:840 - ============================================================
+2025-11-17 16:42:18.762 | INFO     | opt_engine_v2:_log_hardware_config:841 - Hardware Configuration
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:_log_hardware_config:842 - ============================================================
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:_log_hardware_config:843 - CPU: AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:_log_hardware_config:844 - Cores: 6 physical, 12 logical
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:_log_hardware_config:845 - Memory: 7.2 GB
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:_log_hardware_config:846 - System: Windows
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:_log_hardware_config:847 - Performance Tier: amd_mobile
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:_log_hardware_config:848 - Thermal Monitoring: Disabled
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:_log_hardware_config:849 - ============================================================
+2025-11-17 16:42:18.764 | WARNING  | opt_engine_v2:__init__:712 - ⚠️ torch.compile disabled on CPU (unreliable without compiler)
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:__init__:713 -    Using other optimizations instead:
+2025-11-17 16:42:18.764 | INFO     | opt_engine_v2:__init__:714 -    - int8 quantization for 30% speedup
+2025-11-17 16:42:18.765 | INFO     | opt_engine_v2:__init__:715 -    - All 8 CPU cores for 2x speedup
+2025-11-17 16:42:18.765 | INFO     | opt_engine_v2:__init__:716 -    - Direct synthesis (no chunking) for 3x speedup
+2025-11-17 16:42:18.765 | INFO     | opt_engine_v2:__init__:717 -    Total expected: 6-10x speedup without torch.compile
+2025-11-17 16:42:18.765 | INFO     | opt_engine_v2:__init__:722 - Loading Fish Speech models...
+2025-11-17 16:42:18.765 | INFO     | opt_engine_v2:__init__:723 -   Model: C:\Users\tecso\OneDrive\Desktop\VOICE-CLONING-THESIS-2ND-ENV-\final\checkpoints\openaudio-s1-mini
+2025-11-17 16:42:18.765 | INFO     | opt_engine_v2:__init__:724 -   Device: cpu
+2025-11-17 16:42:18.765 | INFO     | opt_engine_v2:__init__:725 -   Mixed Precision: fp32
+2025-11-17 16:42:18.765 | INFO     | opt_engine_v2:__init__:726 -   Torch Compile: False
+2025-11-17 16:42:18.765 | INFO     | opt_engine_v2:__init__:729 - Loading VQ-GAN decoder...
+2025-11-17 16:42:23.079 | INFO     | fish_speech.models.dac.inference:load_model:46 - Loaded model: <All keys matched successfully>
+2025-11-17 16:42:23.085 | INFO     | opt_engine_v2:__init__:737 - Loading Llama text2semantic model...
+2025-11-17 16:42:23.709 | INFO     | fish_speech.models.text2semantic.llama:from_pretrained:432 - Loading model from C:\Users\tecso\OneDrive\Desktop\VOICE-CLONING-THESIS-2ND-ENV-\final\checkpoints\openaudio-s1-mini, config: DualARModelArgs(model_type='dual_ar', vocab_size=155776, n_layer=28, n_head=16, dim=1024, intermediate_size=3072, n_local_heads=8, head_dim=128, rope_base=1000000, norm_eps=1e-06, max_seq_len=8192, dropout=0.0, tie_word_embeddings=False, attention_qkv_bias=False, attention_o_bias=False, attention_qk_norm=True, codebook_size=4096, num_codebooks=10, use_gradient_checkpointing=True, initializer_range=0.03125, is_reward_model=False, scale_codebook_embeddings=True, n_fast_layer=4, fast_dim=1024, fast_n_head=16, fast_n_local_heads=8, fast_head_dim=64, fast_intermediate_size=3072, fast_attention_qkv_bias=False, fast_attention_qk_norm=False, fast_attention_o_bias=False)
+2025-11-17 16:42:33.802 | INFO     | fish_speech.models.text2semantic.llama:from_pretrained:494 - Model weights loaded - Status: <All keys matched successfully>
+2025-11-17 16:42:36.641 | INFO     | fish_speech.models.text2semantic.inference:init_model:357 - Restored model from checkpoint
+2025-11-17 16:42:36.647 | INFO     | fish_speech.models.text2semantic.inference:init_model:362 - Using DualARTransformer
+2025-11-17 16:42:37.952 | INFO     | opt_engine_v2:__init__:750 - 🔍 Force disabling gradient checkpointing...
+2025-11-17 16:42:37.978 | WARNING  | opt_engine_v2:__init__:801 - ℹ️ Could not directly access model object (running in thread) - gradient checkpointing may still be enabled
+2025-11-17 16:42:37.987 | INFO     | opt_engine_v2:__init__:802 - ⚠️ If synthesis is slow, check that use_gradient_checkpointing=False in checkpoint config
+2025-11-17 16:42:38.029 | INFO     | opt_engine_v2:__init__:833 - ⚠️ Warmup skipped to reduce startup time (saves 38+ seconds)
+2025-11-17 16:42:38.031 | INFO     | opt_engine_v2:__init__:835 - ✅ OptimizedFishSpeechV2 initialized successfully!
+2025-11-17 16:42:38.037 | INFO     | universal_optimizer:_initialize_components:453 - ✅ Universal optimizer initialized successfully!
+2025-11-17 16:42:38.048 | INFO     | smart_backend:__init__:875 - 🧠 Intelligent Device Selector initialized
+2025-11-17 16:42:38.049 | INFO     | smart_backend:__init__:876 -    User preference: auto
+2025-11-17 16:42:38.050 | INFO     | smart_backend:__init__:877 -    Device locked: False
+2025-11-17 16:42:38.050 | INFO     | smart_backend:__init__:1071 - ✅ Smart Adaptive Backend initialized successfully!
+2025-11-17 16:42:38.051 | INFO     | smart_backend:__init__:1073 - 💡 Tip: Backend will auto-switch devices if system is overloaded
+2025-11-17 16:42:38.053 | INFO     | smart_backend:__init__:1074 - 💡 To lock device, set DEVICE=cpu or DEVICE=cuda in .env
+[OK] Smart Adaptive Engine initialized
+[INFO] Detected device: cuda
+[INFO] CPU tier: amd_mobile
+[INFO] Optimization strategy: mobile_efficient
+[INFO] Expected RTF: 10.0x
+2025-11-17 16:42:38.369 | INFO     | monitoring:_init_loggers:165 - 📊 Monitoring logs:
+2025-11-17 16:42:38.370 | INFO     | monitoring:_init_loggers:166 -    Synthesis: metrics\synthesis_amd_mobile_20251117_164238.csv
+2025-11-17 16:42:38.370 | INFO     | monitoring:_init_loggers:167 -    Real-time: metrics\realtime_amd_mobile_20251117_164238.csv
+2025-11-17 16:42:38.376 | INFO     | monitoring:_save_hardware_specs:190 - 💾 Hardware specs saved: metrics\hardware_specs_amd_mobile.json
+[OK] Performance monitoring initialized
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+[WARNING] Smart device selection failed: 'UniversalFishSpeechOptimizer' object has no attribute 'device'
+2025-11-17 16:42:45.812 | INFO     | monitoring:start_synthesis:225 - [MONITOR] Starting synthesis: 49141745 (17 tokens)
+2025-11-17 16:42:45.935 | DEBUG    | opt_engine_v2:tts:1059 - Thermal monitoring unavailable - proceeding without protection
+2025-11-17 16:42:45.936 | INFO     | opt_engine_v2:_optimize_audio:971 - Loading reference audio: C:\Users\tecso\AppData\Local\Temp\tmpa383cmnz.wav
+2025-11-17 16:42:45.961 | INFO     | opt_engine_v2:_optimize_audio:974 - Loaded audio: shape=torch.Size([1, 886426]), sr=44100
+2025-11-17 16:42:45.988 | INFO     | opt_engine_v2:_optimize_audio:996 - Saved optimized audio to: C:\Users\tecso\AppData\Local\Temp\fish_opt_v2_ciwtlglw\opt_tmpa383cmnz.wav
+2025-11-17 16:42:46.062 | INFO     | fish_speech.inference_engine.vq_manager:encode_reference:45 - Loaded audio with 20.10 seconds
+2025-11-17 16:43:09.836 | INFO     | fish_speech.inference_engine.vq_manager:encode_reference:52 - Encoded prompt: torch.Size([10, 433])
+2025-11-17 16:43:09.939 | INFO     | fish_speech.models.text2semantic.inference:generate_long:457 - Encoded text: Hello! My name is Bart! I love taking care of my garden and going for a walk!
+  5%|█▋                               | 106/2047 [03:41<1:07:39,  2.09s/it]
+2025-11-17 16:47:08.520 | INFO     | fish_speech.models.text2semantic.inference:generate_long:491 - Generated 108 tokens in 238.36 seconds, 0.45 tokens/sec
+2025-11-17 16:47:08.536 | INFO     | fish_speech.models.text2semantic.inference:generate_long:494 - Bandwidth achieved: 0.39 GB/s
+2025-11-17 16:47:08.538 | INFO     | fish_speech.models.text2semantic.inference:generate_long:497 - GPU Memory used: 0.00 GB
+2025-11-17 16:47:08.617 | INFO     | fish_speech.inference_engine.vq_manager:decode_vq_tokens:20 - VQ features: torch.Size([10, 107])
+2025-11-17 16:47:24.266 | INFO     | opt_engine_v2:tts:1144 - Peak GPU utilization during synthesis: 0.0%
+2025-11-17 16:47:24.266 | INFO     | opt_engine_v2:tts:1195 - TTS completed: 278333ms, RTF=56.01x, VRAM=0MB
+2025-11-17 16:47:24.573 | INFO     | smart_backend:_log_performance:1324 - 📊 Performance Report:
+2025-11-17 16:47:24.573 | INFO     | smart_backend:_log_performance:1325 -   Latency: 278333ms
+2025-11-17 16:47:24.575 | INFO     | smart_backend:_log_performance:1326 -   RTF: 56.01x
+2025-11-17 16:47:24.575 | INFO     | smart_backend:_log_performance:1327 -   Memory Delta: -0.57 GB
+2025-11-17 16:47:24.575 | INFO     | smart_backend:_log_performance:1329 -   GPU Utilization: 0.0%
+2025-11-17 16:47:24.584 | INFO     | monitoring:end_synthesis:339 - [MONITOR] Synthesis complete: 49141745
+  Duration: 278.77s
+  Peak Memory: 7280MB
+  RTF: 56.10x
+  Tokens/sec: 0.39
+INFO:     127.0.0.1:65335 - "POST /tts HTTP/1.1" 200 OK
+[WARNING] Smart device selection failed: 'UniversalFishSpeechOptimizer' object has no attribute 'device'
+2025-11-17 16:49:38.943 | INFO     | monitoring:start_synthesis:225 - [MONITOR] Starting synthesis: ff263204 (17 tokens)
+2025-11-17 16:49:39.046 | DEBUG    | opt_engine_v2:tts:1059 - Thermal monitoring unavailable - proceeding without protection
+2025-11-17 16:49:39.046 | INFO     | opt_engine_v2:_optimize_audio:971 - Loading reference audio: C:\Users\tecso\AppData\Local\Temp\tmp0bramnsh.wav
+2025-11-17 16:49:39.064 | INFO     | opt_engine_v2:_optimize_audio:974 - Loaded audio: shape=torch.Size([1, 886426]), sr=44100
+2025-11-17 16:49:39.078 | INFO     | opt_engine_v2:_optimize_audio:996 - Saved optimized audio to: C:\Users\tecso\AppData\Local\Temp\fish_opt_v2_ciwtlglw\opt_tmp0bramnsh.wav
+2025-11-17 16:49:39.109 | INFO     | fish_speech.inference_engine.vq_manager:encode_reference:45 - Loaded audio with 20.10 seconds
+2025-11-17 16:49:56.667 | INFO     | fish_speech.inference_engine.vq_manager:encode_reference:52 - Encoded prompt: torch.Size([10, 433])
+2025-11-17 16:49:56.736 | INFO     | fish_speech.models.text2semantic.inference:generate_long:457 - Encoded text: Hello! My name is Bart! I love taking care of my garden and going for a walk!
+  5%|█▋                               | 101/2047 [04:11<1:20:41,  2.49s/it]
+2025-11-17 16:54:23.449 | INFO     | fish_speech.models.text2semantic.inference:generate_long:491 - Generated 103 tokens in 266.70 seconds, 0.39 tokens/sec
+2025-11-17 16:54:23.466 | INFO     | fish_speech.models.text2semantic.inference:generate_long:494 - Bandwidth achieved: 0.33 GB/s
+2025-11-17 16:54:23.468 | INFO     | fish_speech.models.text2semantic.inference:generate_long:497 - GPU Memory used: 0.00 GB
+2025-11-17 16:54:23.548 | INFO     | fish_speech.inference_engine.vq_manager:decode_vq_tokens:20 - VQ features: torch.Size([10, 102])
+2025-11-17 16:54:36.960 | INFO     | opt_engine_v2:tts:1144 - Peak GPU utilization during synthesis: 0.0%
+2025-11-17 16:54:36.960 | INFO     | opt_engine_v2:tts:1195 - TTS completed: 297914ms, RTF=62.89x, VRAM=0MB
+2025-11-17 16:54:37.249 | INFO     | smart_backend:_log_performance:1324 - 📊 Performance Report:
+2025-11-17 16:54:37.251 | INFO     | smart_backend:_log_performance:1325 -   Latency: 297914ms
+2025-11-17 16:54:37.251 | INFO     | smart_backend:_log_performance:1326 -   RTF: 62.89x
+2025-11-17 16:54:37.251 | INFO     | smart_backend:_log_performance:1327 -   Memory Delta: -0.56 GB
+2025-11-17 16:54:37.251 | INFO     | smart_backend:_log_performance:1329 -   GPU Utilization: 0.0%
+2025-11-17 16:54:37.254 | INFO     | monitoring:end_synthesis:339 - [MONITOR] Synthesis complete: ff263204
+  Duration: 298.31s
+  Peak Memory: 7237MB
+  RTF: 62.98x
+  Tokens/sec: 0.35
+INFO:     127.0.0.1:57353 - "POST /tts HTTP/1.1" 200 OK

@@ -21,7 +21,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': false,
+            'onnx_runtime': False,
             'threads': 'match_p_cores',
             'mkl_optimization': True,
             'torch_compile': True
@@ -35,11 +35,11 @@ TIER_CONFIGS = {
         }
     },
     'amd_high_end': {
-        'cpu_examples': ['Ryzen 7 5800X', 'Ryzen 9 7900X'],
+        'cpu_examples': ['Ryzen 7 5800X', 'Ryzen 9 7900X' ],
         'optimizations': {
-            'mixed_precision': 'fp32',
+            'mixed_precision': 'fp16',
             'quantization': 'int8',
-            'onnx_runtime': false,
+            'onnx_runtime': False,
             'threads': 'match_cores',
             'amd_optimizations': True,
             'torch_compile': True
@@ -74,7 +74,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8',
-            'onnx_runtime': false,
+            'onnx_runtime': False,
             'threads': 10,
             'thermal_chunking': True
         },
@@ -110,7 +110,7 @@ TIER_CONFIGS = {
         'optimizations': {
             'mixed_precision': 'fp32',
             'quantization': 'int8_aggressive',
-            'onnx_runtime': false,
+            'onnx_runtime': False,
             'threads': 'match_cores',
             'memory_conservative': True,
             'chunk_size_small': True
@@ -126,9 +126,9 @@ TIER_CONFIGS = {
     'amd_mobile': {
         'cpu_examples': ['Ryzen 3 5300U', 'Ryzen 5 5500U'],
         'optimizations': {
-            'mixed_precision': 'fp32',
+            'mixed_precision': 'fp16',
             'quantization': 'int8',
-            'onnx_runtime': false,
+            'onnx_runtime': False,
             'amd_threading': True,
             'power_management': True
         },

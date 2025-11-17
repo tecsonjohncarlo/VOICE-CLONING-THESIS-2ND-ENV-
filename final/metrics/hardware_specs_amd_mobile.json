@@ -1,0 +1,14 @@
+{
+  "hardware_tier": "amd_mobile",
+  "device_type": "cuda",
+  "cpu_model": "AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD",
+  "cores_physical": 6,
+  "cores_logical": 12,
+  "memory_gb": 7.206745147705078,
+  "gpu_name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "gpu_memory_gb": 5.99658203125,
+  "system": "Windows",
+  "machine": "AMD64",
+  "thermal_capable": false,
+  "avx512_vnni": false
+}
